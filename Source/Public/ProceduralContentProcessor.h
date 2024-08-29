@@ -17,6 +17,9 @@ public:
 	UFUNCTION(BlueprintImplementableEvent, Category = "ProceduralContentProcessor", meta = (DisplayName = "Deactivate"))
 	void ReceiveDeactivate();
 
+	UFUNCTION(BlueprintImplementableEvent, Category = "ProceduralContentProcessor", meta = (DisplayName = "PostEditChangeProperty"))
+	void ReceivePostEditChangeProperty(FName InPropertyName);
+
 	virtual void Activate();
 
 	virtual void Tick(const float InDeltaTime);
@@ -24,6 +27,7 @@ public:
 	virtual void Deactivate();
 
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override{
+		ReceivePostEditChangeProperty(PropertyChangedEvent.GetPropertyName());
 		TryUpdateDefaultConfigFile();
 	}
 
@@ -58,7 +62,10 @@ public:
 	static void DisableInstancedFoliageMeshShadow(TArray<UStaticMesh*> InMeshes);
 
 	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
-	static void BreakInstancedStaticMeshComp(AActor* InSourceActor, bool bDestorySourceActor = true);
+	static TArray<AActor*> BreakISM(AActor* InISMActor, bool bDestorySourceActor = true);
+
+	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
+	static AActor* MergeISM(TArray<AActor*> InSourceActors, TSubclassOf<UInstancedStaticMeshComponent> InISMClass, bool bDestorySourceActor = true);
 
 	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
 	static void SetHLODLayer(AActor* InActor, UHLODLayer *InHLODLayer);
@@ -90,6 +97,11 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
 	static void ActorSetRuntimeGrid(AActor* Actor, FName GridName);
 
+	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
+	static bool HasImposter(AStaticMeshActor* InStaticMeshActor);
+
+	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
+	static void AppendImposterToLODChain(AStaticMeshActor* InStaticMeshActor, AActor* BP_Generate_ImposterSprites, float ScreenSize);
 protected:
 	virtual UWorld* GetWorld() const override;
 };
@@ -103,6 +115,7 @@ public:
 
 	UFUNCTION(BlueprintNativeEvent, Category = "ProceduralContentProcessor", meta = (DisplayName = "Colour"))
 	FLinearColor Colour(const UPrimitiveComponent* PrimitiveComponent);
+
 protected:
 	void OnLevelActorListChanged();
 	void OnLevelActorAdded(AActor* InActor);

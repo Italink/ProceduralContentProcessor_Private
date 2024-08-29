@@ -28,46 +28,82 @@
 
 #define LOCTEXT_NAMESPACE "ProceduralContentProcessor"
 
-void UProceduralContentProcessorLibrary::ClearPropertyMaterix(FProceduralPropertyMatrix& Matrix)
+void UProceduralContentProcessorLibrary::ClearObjectMaterix(FProceduralObjectMatrix& Matrix)
 {
 	Matrix.ObjectInfoList.Reset();
 	Matrix.ObjectInfoMap.Reset();
 	Matrix.bIsDirty = true;
 }
 
-void UProceduralContentProcessorLibrary::AddPropertyMaterixField(FProceduralPropertyMatrix& Matrix, UObject* InObject, FName InPropertyName)
+void UProceduralContentProcessorLibrary::AddPropertyFieldWithOwner(FProceduralObjectMatrix& Matrix, UObject* InOwner, UObject* InObject, FName InPropertyName)
 {
 	Matrix.FieldKeys.AddUnique(InPropertyName);
-	auto InfoPtr = Matrix.ObjectInfoMap.Find(InObject);
-	TSharedPtr<FProceduralPropertyMatrixInfo> Info;
+	auto InfoPtr = Matrix.ObjectInfoMap.Find(InOwner);
+	TSharedPtr<FProceduralObjectMatrixRow> Info;
 	if (!InfoPtr) {
-		Info = MakeShared<FProceduralPropertyMatrixInfo>();
-		Info->Object = InObject;
-		Matrix.ObjectInfoMap.Add(InObject, Info);
+		Info = MakeShared<FProceduralObjectMatrixRow>();
+		Info->Owner = InOwner;
+		Matrix.ObjectInfoMap.Add(InOwner, Info);
 		Matrix.ObjectInfoList.Add(Info);
 	}
 	else {
 		Info = *InfoPtr;
 	}
-	Info->Fields.AddUnique({ InPropertyName ,FString()});
+
+	TSharedPtr<FProceduralObjectMatrixPropertyField> Field = MakeShared<FProceduralObjectMatrixPropertyField>();
+	Field->Owner = InOwner;
+	Field->Object = InObject;
+	Field->Name = InPropertyName;
+	Field->PropertyName = InPropertyName.ToString();
+	Info->AddField(Field);
+
 	Matrix.bIsDirty = true;
 }
 
-void UProceduralContentProcessorLibrary::AddPropertyMaterixFieldValue(FProceduralPropertyMatrix& Matrix, UObject* InObject, FName InFieldName, FString InFieldValue)
+void UProceduralContentProcessorLibrary::AddPropertyField(FProceduralObjectMatrix& Matrix, UObject* InObject, FName InPropertyName)
 {
-	Matrix.FieldKeys.AddUnique(InFieldName);
+	Matrix.FieldKeys.AddUnique(InPropertyName);
 	auto InfoPtr = Matrix.ObjectInfoMap.Find(InObject);
-	TSharedPtr<FProceduralPropertyMatrixInfo> Info;
+	TSharedPtr<FProceduralObjectMatrixRow> Info;
 	if (!InfoPtr) {
-		Info = MakeShared<FProceduralPropertyMatrixInfo>();
-		Info->Object = InObject;
+		Info = MakeShared<FProceduralObjectMatrixRow>();
+		Info->Owner = InObject;
 		Matrix.ObjectInfoMap.Add(InObject, Info);
 		Matrix.ObjectInfoList.Add(Info);
 	}
 	else {
 		Info = *InfoPtr;
 	}
-	Info->Fields.AddUnique({ InFieldName ,InFieldValue });
+
+	TSharedPtr<FProceduralObjectMatrixPropertyField> Field = MakeShared<FProceduralObjectMatrixPropertyField>();
+	Field->Owner = InObject;
+	Field->Object = InObject;
+	Field->Name = InPropertyName;
+	Field->PropertyName = InPropertyName.ToString();
+	Info->AddField(Field);
+
+	Matrix.bIsDirty = true;
+}
+
+void UProceduralContentProcessorLibrary::AddTextField(FProceduralObjectMatrix& Matrix, UObject* InObject, FName InFieldName, FString InFieldValue)
+{
+	Matrix.FieldKeys.AddUnique(InFieldName);
+	auto InfoPtr = Matrix.ObjectInfoMap.Find(InObject);
+	TSharedPtr<FProceduralObjectMatrixRow> Info;
+	if (!InfoPtr) {
+		Info = MakeShared<FProceduralObjectMatrixRow>();
+		Info->Owner = InObject;
+		Matrix.ObjectInfoMap.Add(InObject, Info);
+		Matrix.ObjectInfoList.Add(Info);;
+	}
+	else {
+		Info = *InfoPtr;
+	}
+	TSharedPtr<FProceduralObjectMatrixTextField> Field = MakeShared<FProceduralObjectMatrixTextField>();
+	Field->Owner = InObject;
+	Field->Name = InFieldName;
+	Field->Text = InFieldValue;
+	Info->AddField(Field);
 	Matrix.bIsDirty = true;
 }
 
@@ -271,6 +307,23 @@ void UProceduralContentProcessorLibrary::SetStaticMeshPivot(UStaticMesh* InStati
 		EditTool->Tick(0.1);
 		EditTool->Shutdown(EToolShutdownType::Accept);
 	}
+}
+
+float UProceduralContentProcessorLibrary::GetLodScreenSize(UStaticMesh* InStaticMesh, int32 LODIndex)
+{
+	if (InStaticMesh == nullptr || LODIndex< 0 || LODIndex >= InStaticMesh->GetNumLODs() || InStaticMesh->GetRenderData() == nullptr)
+		return 0;
+	return InStaticMesh->GetRenderData()->ScreenSize[LODIndex].GetValue();
+}
+
+float UProceduralContentProcessorLibrary::GetLodDistance(UStaticMesh* InStaticMesh, int32 LODIndex, float FOV)
+{
+	if(LODIndex == 0)
+		return 0;
+	float ScreenSize = GetLodScreenSize(InStaticMesh, LODIndex);
+	const float FOVRad = FOV * (float)UE_PI / 360.0f;
+	const FMatrix ProjectionMatrix = FPerspectiveMatrix(FOVRad, 1920, 1080, 0.01f);
+	return ComputeBoundsDrawDistance(ScreenSize, InStaticMesh->GetBounds().SphereRadius, ProjectionMatrix);
 }
 
 #undef LOCTEXT_NAMESPACE

@@ -28,7 +28,6 @@ SProceduralContentProcessorEditorOutliner::~SProceduralContentProcessorEditorOut
 
 void SProceduralContentProcessorEditorOutliner::Construct(const FArguments& InArgs)
 {
-
 	ChildSlot[
 		SNew(SVerticalBox)
 		+ SVerticalBox::Slot()
@@ -44,14 +43,9 @@ void SProceduralContentProcessorEditorOutliner::Construct(const FArguments& InAr
 				.ContentPadding(FMargin(2.0f, 2.0f))
 				.ButtonContent()
 				[
-					SAssignNew(CurrentProcessorBox, SSuggestionTextBox)
-					.ForegroundColor(FSlateColor::UseForeground())
-					.BackgroundImage(FSlateIconFinder::FindIcon("NoBorder").GetIcon())
-					.SuggestionTextStyle(&FAppStyle::Get().GetWidgetStyle<FTextBlockStyle>("ButtonText"))
+					
+					SAssignNew(CurrentProcessorBox, STextBlock)
 					.Text(this, &SProceduralContentProcessorEditorOutliner::OnGetCurrentProcessorText)
-					.OnShowingSuggestions(this, &SProceduralContentProcessorEditorOutliner::OnGetProcessorSuggestionText)
-					.OnTextCommitted(this, &SProceduralContentProcessorEditorOutliner::OnProcessorTextCommitted)
-					.OnTextChanged(this, &SProceduralContentProcessorEditorOutliner::OnProcessorTextChanged)
 				]
 			]
 			+ SHorizontalBox::Slot()
@@ -60,8 +54,7 @@ void SProceduralContentProcessorEditorOutliner::Construct(const FArguments& InAr
 			[
 				PropertyCustomizationHelpers::MakeBrowseButton(
 					FSimpleDelegate::CreateSP(this, &SProceduralContentProcessorEditorOutliner::OnBrowseToCurrentProcessorBlueprint),
-					FText(),
-					TAttribute<bool>::CreateSP(this,&SProceduralContentProcessorEditorOutliner::CanBrowseToCurrentProcessorBlueprint)
+					FText()
 				)
 			]
 		]
@@ -78,6 +71,10 @@ void SProceduralContentProcessorEditorOutliner::Construct(const FArguments& InAr
 	AssetRegistry.OnAssetUpdated().AddSP(this, &SProceduralContentProcessorEditorOutliner::OnAssetUpdated);
 
 	FEditorDelegates::MapChange.AddSP(this, &SProceduralContentProcessorEditorOutliner::OnMapChanged);
+	GEditor->OnBlueprintPreCompile().AddSP(this,& SProceduralContentProcessorEditorOutliner::OnBlueprintPreCompile);
+
+	FWorldDelegates::OnWorldCleanup.AddSP(this, &SProceduralContentProcessorEditorOutliner::OnMapCleanup);
+	FEditorDelegates::PreSaveWorldWithContext.AddSP(this, &SProceduralContentProcessorEditorOutliner::OnPreSaveWorld);
 
 	RequestRefreshProcessorList();
 }
@@ -88,6 +85,10 @@ void SProceduralContentProcessorEditorOutliner::Tick(const FGeometry& AllottedGe
 		RefreshProcessorList();
 		bNeedRefreshProcessorList = false;
 	}
+	if (CurrentProcessor) {
+		CurrentProcessor->Tick(InDeltaTime);
+	}
+
 	SCompoundWidget::Tick(AllottedGeometry, InCurrentTime, InDeltaTime);
 }
 
@@ -96,6 +97,7 @@ void SProceduralContentProcessorEditorOutliner::RefreshProcessorList()
 	ProcessorList.Reset();
 	for (auto Watcher : BlueprintCompileWatcher) {
 		Watcher->OnCompiled().RemoveAll(this);
+		Watcher->OnChanged().RemoveAll(this);
 	}
 	BlueprintCompileWatcher.Reset();
 	TopLevelProcessorField.Reset();
@@ -182,13 +184,15 @@ void SProceduralContentProcessorEditorOutliner::RefreshProcessorList()
 	}
 }
 
-void SProceduralContentProcessorEditorOutliner::SetCurrentProcessor(UClass* InProcessorClass)
+void SProceduralContentProcessorEditorOutliner::SetCurrentProcessor(UClass* InProcessorClass, bool bSaveConfig)
 {
 	if (CurrentProcessor) {
 		CurrentProcessor->Deactivate();
 	}
-	GetMutableDefault<UProceduralContentProcessorSettings>()->LastProcessorClass = InProcessorClass;
-	GetMutableDefault<UProceduralContentProcessorSettings>()->TryUpdateDefaultConfigFile();
+	if (bSaveConfig) {
+		GetMutableDefault<UProceduralContentProcessorSettings>()->LastProcessorClass = InProcessorClass;
+		GetMutableDefault<UProceduralContentProcessorSettings>()->TryUpdateDefaultConfigFile();
+	}
 	if (InProcessorClass) {
 		CurrentProcessor = NewObject<UProceduralContentProcessor>(GetTransientPackage(), InProcessorClass);
 		ProcessorWidgetContainter->SetContent(CurrentProcessor->BuildWidget().ToSharedRef());
@@ -204,6 +208,7 @@ void SProceduralContentProcessorEditorOutliner::SetCurrentProcessor(UClass* InPr
 
 void SProceduralContentProcessorEditorOutliner::RequestRefreshProcessorList()
 {
+	SetCurrentProcessor(nullptr, false);
 	bNeedRefreshProcessorList = true;
 }
 
@@ -217,6 +222,26 @@ void SProceduralContentProcessorEditorOutliner::OnMapChanged(uint32 MapChangeFla
 {
 	UWorld* World = GEditor->GetEditorWorldContext().World();
 	RequestRefreshProcessorList();
+}
+
+void SProceduralContentProcessorEditorOutliner::OnMapCleanup(UWorld* World, bool bSessionEnded, bool bCleanupResources)
+{
+	if (World->WorldType == EWorldType::Editor) {
+		SetCurrentProcessor(nullptr, false);
+	}
+}
+
+void SProceduralContentProcessorEditorOutliner::OnPreSaveWorld(UWorld* InWorld, FObjectPreSaveContext ObjectSaveContext)
+{
+	SetCurrentProcessor(nullptr, false);
+	RequestRefreshProcessorList();
+}
+
+void SProceduralContentProcessorEditorOutliner::OnBlueprintPreCompile(UBlueprint* InBlueprint)
+{
+	if (Cast<UProceduralContentProcessorBlueprint>(InBlueprint)) {
+		SetCurrentProcessor(nullptr, false);
+	}
 }
 
 void SProceduralContentProcessorEditorOutliner::OnBlueprintCompiled(UBlueprint* InBlueprint)
@@ -248,33 +273,11 @@ void SProceduralContentProcessorEditorOutliner::OnAssetUpdated(const FAssetData&
 void SProceduralContentProcessorEditorOutliner::OnBrowseToCurrentProcessorBlueprint()
 {
 	FContentBrowserModule& ContentBrowserModule = FModuleManager::Get().LoadModuleChecked<FContentBrowserModule>("ContentBrowser");
-	ContentBrowserModule.Get().SyncBrowserToAssets({ CurrentProcessor->GetClass()->ClassGeneratedBy });
-}
-
-bool SProceduralContentProcessorEditorOutliner::CanBrowseToCurrentProcessorBlueprint()
-{
-	return CurrentProcessor && CurrentProcessor->GetClass() && CurrentProcessor->GetClass()->ClassGeneratedBy;
-}
-
-void SProceduralContentProcessorEditorOutliner::OnProcessorTextCommitted(const FText& NewText, ETextCommit::Type CommitInfo)
-{
-	if(CurrentProcessor && NewText.ToString() == CurrentProcessor->GetClass()->GetDisplayNameText().ToString())
-		return;
-	for (auto Item : ProcessorList) {
-		if (Item->GetDisplayNameText().ToString() == NewText.ToString()) {
-			SetCurrentProcessor(Item);
-			break;
-		}
+	if (CurrentProcessor) {
+		ContentBrowserModule.Get().SyncBrowserToAssets({ CurrentProcessor->GetClass()->ClassGeneratedBy });
 	}
-	SetCurrentProcessor(nullptr);
-}
-
-void SProceduralContentProcessorEditorOutliner::OnGetProcessorSuggestionText(const FString& CurrText, TArray<FString>& OutSuggestions)
-{
-	for (auto Item : ProcessorList) {
-		if (Item->GetDisplayNameText().ToString().Contains(CurrText)) {
-			OutSuggestions.Add(Item->GetDisplayNameText().ToString());
-		}
+	else {
+		ContentBrowserModule.Get().SyncBrowserToFolders({ "/ProceduralContentProcessor" }, true);
 	}
 }
 

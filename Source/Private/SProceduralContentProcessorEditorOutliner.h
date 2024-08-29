@@ -43,7 +43,7 @@ public:
 public:
 	~SProceduralContentProcessorEditorOutliner();
 	void Construct(const FArguments& InArgs);
-	void SetCurrentProcessor(UClass* InProcessorClass);
+	void SetCurrentProcessor(UClass* InProcessorClass, bool bSaveConfig = true);
 	void RequestRefreshProcessorList();
 protected:
 	virtual void AddReferencedObjects(FReferenceCollector& Collector) override;
@@ -54,16 +54,16 @@ protected:
 	void RefreshProcessorList();
 
 	void OnMapChanged(uint32 MapChangeFlags);
+	void OnMapCleanup(UWorld* World, bool bSessionEnded, bool bCleanupResources);
+	void OnPreSaveWorld(UWorld* InWorld, FObjectPreSaveContext ObjectSaveContext);
+	void OnBlueprintPreCompile(UBlueprint* InBlueprint);
 	void OnBlueprintCompiled(UBlueprint* InBlueprint);
 	void OnSelectionChanged(TSharedPtr<FString> NewSelection, ESelectInfo::Type SelectInfo);
 	void OnAssetAdded(const FAssetData& InData);
 	void OnAssetRemoved(const FAssetData& InData);
 	void OnAssetUpdated(const FAssetData& InData);
 	void OnBrowseToCurrentProcessorBlueprint();
-	bool CanBrowseToCurrentProcessorBlueprint();
 
-	void OnProcessorTextCommitted(const FText& NewText, ETextCommit::Type CommitInfo);
-	void OnGetProcessorSuggestionText(const FString& CurrText, TArray<FString>& OutSuggestions);
 	void OnProcessorTextChanged(const FText& InNewText);
 	FText OnGetCurrentProcessorText() const;
 
@@ -78,8 +78,7 @@ private:
 	TArray<UClass*> ProcessorList;
 	TObjectPtr<UProceduralContentProcessor> CurrentProcessor;
 	TArray<UBlueprint*> BlueprintCompileWatcher;
-
-	TSharedPtr<SSuggestionTextBox> CurrentProcessorBox;
+	TSharedPtr<STextBlock> CurrentProcessorBox;
 	FText CurrentProcessorText;
 	TArray<TSharedPtr<FProcessorOutlinerField>> TopLevelProcessorField;
 	TSharedPtr<SComboButton> ProcessorComboButton;

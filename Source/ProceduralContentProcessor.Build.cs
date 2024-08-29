@@ -52,7 +52,13 @@ public class ProceduralContentProcessor : ModuleRules
                 "MeshModelingToolsExp",
                 "ModelingComponentsEditorOnly",
                 "InteractiveToolsFramework",
-                "EditorInteractiveToolsFramework"
+                "EditorInteractiveToolsFramework",
+                "StaticMeshDescription",
+                "MeshDescription",
+                "MeshDescriptionOperations",
+                "MeshBoneReduction",
+                "MeshPaint",
+                "ProceduralMeshComponent",
 				// ... add private dependencies that you statically link with here ...	
 			}
 			);

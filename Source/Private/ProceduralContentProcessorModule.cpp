@@ -16,7 +16,7 @@
 #include "ProceduralContentProcessor.h"
 #include "ProceduralContentProcessorAssetActions.h"
 #include "ProceduralContentProcessorEdMode.h"
-#include "ProceduralPropertyMatrixCustomization.h"
+#include "ProceduralObjectMatrixCustomization.h"
 #include "SProceduralContentProcessorEditorOutliner.h"
 #include "Toolkits/AssetEditorToolkitMenuContext.h"
 #include "ToolMenus.h"
@@ -38,7 +38,7 @@ void FProceduralContentProcessorModule::StartupModule()
 	AssetTools.RegisterAdvancedAssetCategory("ProceduralContentProcessor", LOCTEXT("ProceduralContentProcessor", "Procedural Content Processor"));
 
 	FPropertyEditorModule& PropertyModule = FModuleManager::GetModuleChecked<FPropertyEditorModule>("PropertyEditor");
-	PropertyModule.RegisterCustomPropertyTypeLayout(FProceduralPropertyMatrix::StaticStruct()->GetFName(), FOnGetPropertyTypeCustomizationInstance::CreateStatic(&FPropertyTypeCustomization_ProceduralPropertyMatrix::MakeInstance));
+	PropertyModule.RegisterCustomPropertyTypeLayout(FProceduralObjectMatrix::StaticStruct()->GetFName(), FOnGetPropertyTypeCustomizationInstance::CreateStatic(&FPropertyTypeCustomization_ProceduralObjectMatrix::MakeInstance));
 
 	ProceduralAssetProcessorAssetActions = MakeShared<FProceduralAssetProcessorAssetActions>();
 	AssetTools.RegisterAssetTypeActions(ProceduralAssetProcessorAssetActions.ToSharedRef());

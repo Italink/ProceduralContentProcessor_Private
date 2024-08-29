@@ -1,7 +1,7 @@
 ﻿#pragma once
 
 #include "CoreMinimal.h"
-#include "ProceduralPropertyMatrix.h"
+#include "ProceduralObjectMatrix.h"
 #include "ProceduralContentProcessorLibrary.generated.h"
 
 class ALandscape;
@@ -52,13 +52,16 @@ class PROCEDURALCONTENTPROCESSOR_API UProceduralContentProcessorLibrary : public
 	GENERATED_BODY()
 public:
 	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
-	static void ClearPropertyMaterix(UPARAM(ref) FProceduralPropertyMatrix& Matrix);
+	static void ClearObjectMaterix(UPARAM(ref) FProceduralObjectMatrix& Matrix);
 
 	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
-	static void AddPropertyMaterixField(UPARAM(ref) FProceduralPropertyMatrix& Matrix, UObject* InObject, FName InPropertyName);
+	static void AddPropertyField(UPARAM(ref) FProceduralObjectMatrix& Matrix, UObject* InObject, FName InPropertyName);
 
 	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
-	static void AddPropertyMaterixFieldValue(UPARAM(ref) FProceduralPropertyMatrix& Matrix, UObject* InObject, FName InFieldName, FString InFieldValue);
+	static void AddPropertyFieldWithOwner(UPARAM(ref) FProceduralObjectMatrix& Matrix, UObject* InOwner, UObject* InObject, FName InPropertyName);
+
+	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
+	static void AddTextField(UPARAM(ref) FProceduralObjectMatrix& Matrix, UObject* InObject, FName InFieldName, FString InFieldValue);
 
 	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
 	static void BeginTransaction(FText Text);
@@ -108,6 +111,13 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
 	static UStaticMesh* GetComplexCollisionMesh(UStaticMesh* InMesh);
 
+
 	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
 	static void SetStaticMeshPivot(UStaticMesh* InStaticMesh, EStaticMeshPivotType PivotType);
+
+	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
+	static float GetLodScreenSize(UStaticMesh* InStaticMesh, int32 LODIndex);
+
+	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
+	static float GetLodDistance(UStaticMesh* InStaticMesh, int32 LODIndex, float FOV = 90.0f);
 };

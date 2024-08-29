@@ -10,8 +10,19 @@
 #include "Selection.h"
 #include "DataLayer/DataLayerEditorSubsystem.h"
 #include "AssetRegistry/AssetRegistryHelpers.h"
-#include "GameFramework/ActorPrimitiveColorHandler.h"
 #include "SLevelViewport.h"
+#include "Factories/MaterialInstanceConstantFactoryNew.h"
+#include "Materials/MaterialInstanceConstant.h"
+#include "StaticMeshAttributes.h"
+#include "Engine/TextureRenderTarget.h"
+#include "ProceduralMeshComponent.h"
+#include "ProceduralMeshConversion.h"
+#include "StaticMeshCompiler.h"
+#include "Engine/TextureRenderTarget2D.h"
+
+#if ENGINE_MAJOR_VERSION >=5 && ENGINE_MINOR_VERSION >= 4
+#include "GameFramework/ActorPrimitiveColorHandler.h"
+#endif
 
 #define LOCTEXT_NAMESPACE "ProceduralContentProcessor"
 
@@ -50,7 +61,7 @@ TSharedPtr<SWidget> UProceduralContentProcessor::BuildWidget()
 	DetailsViewArgs.ViewIdentifier = FName("BlueprintDefaults");
 	auto DetailView = EditModule.CreateDetailView(DetailsViewArgs);
 	DetailView->SetIsPropertyVisibleDelegate(FIsPropertyVisible::CreateLambda([](const FPropertyAndParent& Node) {
-		return !Node.Property.HasAnyPropertyFlags(EPropertyFlags::CPF_AdvancedDisplay);
+		return !(Node.Property.HasAnyPropertyFlags(EPropertyFlags::CPF_AdvancedDisplay) || Node.Property.HasAnyPropertyFlags(EPropertyFlags::CPF_DisableEditOnInstance));
 	}));
 	DetailView->SetIsPropertyReadOnlyDelegate(FIsPropertyReadOnly::CreateLambda([](const FPropertyAndParent& Node) {
 		return Node.Property.HasAnyPropertyFlags(EPropertyFlags::CPF_DisableEditOnInstance);
@@ -171,46 +182,108 @@ void UProceduralWorldProcessor::DisableInstancedFoliageMeshShadow(TArray<UStatic
 	}
 }
 
-void UProceduralWorldProcessor::BreakInstancedStaticMeshComp(AActor* InSourceActor, bool bDestorySourceActor)
+TArray<AActor*> UProceduralWorldProcessor::BreakISM(AActor* InISMActor, bool bDestorySourceActor /*= true*/)
 {
-	if(!InSourceActor)
-		return;
+	TArray<AActor*> Actors;
+	if (!InISMActor)
+		return Actors;
 	ULayersSubsystem* LayersSubsystem = GEditor->GetEditorSubsystem<ULayersSubsystem>();
 	TArray<UInstancedStaticMeshComponent*> InstanceComps;
-	InSourceActor->GetComponents(InstanceComps, true);
+	InISMActor->GetComponents(InstanceComps, true);
 	if (!InstanceComps.IsEmpty()) {
 		for (auto& ISMC : InstanceComps) {
-			for (auto PISMData : ISMC->PerInstanceSMData) {
+			for(int i = 0; i< ISMC->GetInstanceCount(); i++){
 				FActorSpawnParameters SpawnInfo;
 				SpawnInfo.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-				auto NewActor = InSourceActor->GetWorld()->SpawnActor<AStaticMeshActor>(AStaticMeshActor::StaticClass(), FTransform(PISMData.Transform), SpawnInfo);
+				FTransform Transform;
+				ISMC->GetInstanceTransform(i, Transform,true);
+				auto NewActor = InISMActor->GetWorld()->SpawnActor<AStaticMeshActor>(AStaticMeshActor::StaticClass(), Transform, SpawnInfo);
 				NewActor->GetStaticMeshComponent()->SetStaticMesh(ISMC->GetStaticMesh());
-				NewActor->SetActorLabel(InSourceActor->GetActorLabel());
+				NewActor->SetActorLabel(InISMActor->GetActorLabel());
+				auto Materials = ISMC->GetMaterials();
+				for (int j = 0; j < Materials.Num(); j++) 
+					NewActor->GetStaticMeshComponent()->SetMaterial(j, Materials[j]);
 				NewActor->Modify();
+				Actors.Add(NewActor);
 				LayersSubsystem->InitializeNewActorLayers(NewActor);
-				const bool bCurrentActorSelected = GUnrealEd->GetSelectedActors()->IsSelected(InSourceActor);
+				const bool bCurrentActorSelected = GUnrealEd->GetSelectedActors()->IsSelected(InISMActor);
 				if (bCurrentActorSelected)
 				{
 					// The source actor was selected, so deselect the old actor and select the new one.
 					GUnrealEd->GetSelectedActors()->Modify();
 					GUnrealEd->SelectActor(NewActor, bCurrentActorSelected, false);
-					GUnrealEd->SelectActor(InSourceActor, false, false);
+					GUnrealEd->SelectActor(InISMActor, false, false);
 				}
 				{
 					LayersSubsystem->DisassociateActorFromLayers(NewActor);
 					NewActor->Layers.Empty();
-					LayersSubsystem->AddActorToLayers(NewActor, InSourceActor->Layers);
+					LayersSubsystem->AddActorToLayers(NewActor, InISMActor->Layers);
 				}
-
 			}
 			ISMC->PerInstanceSMData.Reset();
 			if (bDestorySourceActor) {
-				LayersSubsystem->DisassociateActorFromLayers(InSourceActor);
-				InSourceActor->GetWorld()->EditorDestroyActor(InSourceActor, true);
+				LayersSubsystem->DisassociateActorFromLayers(InISMActor);
+				InISMActor->GetWorld()->EditorDestroyActor(InISMActor, true);
 			}
 			GUnrealEd->NoteSelectionChange();
 		}
 	}
+	return Actors;
+}
+
+AActor* UProceduralWorldProcessor::MergeISM(TArray<AActor*> InSourceActors, TSubclassOf<UInstancedStaticMeshComponent> InISMClass, bool bDestorySourceActor /*= true*/)
+{
+	if (InSourceActors.IsEmpty() || !InISMClass)
+		return nullptr;
+	ULayersSubsystem* LayersSubsystem = GEditor->GetEditorSubsystem<ULayersSubsystem>();
+	FActorSpawnParameters SpawnInfo;
+	SpawnInfo.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	UWorld* World = InSourceActors[0]->GetWorld();
+	FBoxSphereBounds Bounds;
+	TMap<UStaticMesh*, TArray<FTransform>> InstancedMap;
+	for (auto Actor : InSourceActors) {
+		TArray<UStaticMeshComponent*> MeshComps;
+		Actor->GetComponents(MeshComps, true);
+		for (auto MeshComp : MeshComps) {
+			UStaticMesh* Mesh = MeshComp->GetStaticMesh();
+			auto& InstancedInfo = InstancedMap.FindOrAdd(Mesh);
+			Bounds = MeshComp->Bounds + Bounds;
+			InstancedInfo.Add(MeshComp->K2_GetComponentToWorld());
+		}
+	}
+	FTransform Transform;
+	Transform.SetLocation(Bounds.Origin);
+	auto NewISMActor = World->SpawnActor<AActor>(AActor::StaticClass(),Transform, SpawnInfo);
+	USceneComponent* RootComponent = NewObject<USceneComponent>(NewISMActor, USceneComponent::GetDefaultSceneRootVariableName(), RF_Transactional);
+	RootComponent->Mobility = EComponentMobility::Movable;
+	RootComponent->bVisualizeComponent = true;
+	NewISMActor->SetRootComponent(RootComponent);
+	NewISMActor->AddInstanceComponent(RootComponent);
+	RootComponent->OnComponentCreated();
+	RootComponent->RegisterComponent();
+
+	for (const auto& InstancedInfo : InstancedMap) {
+		UInstancedStaticMeshComponent* ISMComponent = NewObject<UInstancedStaticMeshComponent>(NewISMActor, *InstancedInfo.Key->GetName(), RF_Transactional);
+		NewISMActor->AddInstanceComponent(ISMComponent);
+		ISMComponent->AttachToComponent(RootComponent, FAttachmentTransformRules::KeepRelativeTransform);
+		ISMComponent->OnComponentCreated();
+		ISMComponent->RegisterComponent();
+		ISMComponent->SetStaticMesh(InstancedInfo.Key);
+		for (auto InstanceTransform : InstancedInfo.Value) {
+			ISMComponent->AddInstance(InstanceTransform, true);
+		}
+	}
+	NewISMActor->Modify();
+	LayersSubsystem->InitializeNewActorLayers(NewISMActor);
+	GUnrealEd->GetSelectedActors()->Modify();
+	GUnrealEd->SelectActor(NewISMActor, true, false);
+	if (bDestorySourceActor) {
+		for (auto Actor : InSourceActors) {
+			LayersSubsystem->DisassociateActorFromLayers(Actor);
+			World->EditorDestroyActor(Actor, true);
+		}
+	}
+	return NewISMActor;
 }
 
 void UProceduralWorldProcessor::SetHLODLayer(AActor* InActor, UHLODLayer* InHLODLayer)
@@ -307,6 +380,132 @@ void UProceduralWorldProcessor::ActorSetRuntimeGrid(AActor* Actor, FName GridNam
 	}
 }
 
+bool UProceduralWorldProcessor::HasImposter(AStaticMeshActor* InStaticMeshActor)
+{
+	if (!InStaticMeshActor)
+		return false;
+	UStaticMesh* StaticMesh = InStaticMeshActor->GetStaticMeshComponent()->GetStaticMesh();
+	UMaterialInstanceConstant* MIC = FindObject<UMaterialInstanceConstant>(StaticMesh, TEXT("MIC_Impostor"));
+	return MIC != nullptr;
+}
+
+void UProceduralWorldProcessor::AppendImposterToLODChain(AStaticMeshActor* InStaticMeshActor, AActor* BP_Generate_ImposterSprites, float ScreenSize)
+{
+	if(!InStaticMeshActor || !BP_Generate_ImposterSprites)
+		return;
+	UStaticMesh* StaticMesh = InStaticMeshActor->GetStaticMeshComponent()->GetStaticMesh();
+	UClass* BPClass = BP_Generate_ImposterSprites->GetClass();
+	if (UFunction* ClearRTFunc = BPClass->FindFunctionByName("1) Clear RTs")) {
+		BP_Generate_ImposterSprites->ProcessEvent(ClearRTFunc, nullptr);
+	}
+	if (UFunction* RenderFramesFunc = BPClass->FindFunctionByName("2) RenderFrames")) {
+		if (FObjectProperty* ActorProp = FindFProperty<FObjectProperty>(BPClass, "Static Mesh Actor")) {
+			ActorProp->SetObjectPropertyValue_InContainer(BP_Generate_ImposterSprites, InStaticMeshActor);
+			BP_Generate_ImposterSprites->UserConstructionScript();
+		}
+		BP_Generate_ImposterSprites->ProcessEvent(RenderFramesFunc, nullptr);
+	}
+	int32 ImpostorType = -1;
+	UMaterialInterface* MaterialInterface = nullptr;
+	if (FByteProperty* ImpostorTypeProp = FindFProperty<FByteProperty>(BPClass, "Impostor Type")) {
+		ImpostorType = ImpostorTypeProp->GetUnsignedIntPropertyValue_InContainer(BP_Generate_ImposterSprites);
+	}
+	FObjectProperty* MaterialProp = nullptr;
+	if (ImpostorType == 0) {
+		MaterialProp = FindFProperty<FObjectProperty>(BPClass, "Full Sphere Material");
+	}
+	else if (ImpostorType == 1) {
+		MaterialProp = FindFProperty<FObjectProperty>(BPClass, "Upper Hemisphere Material");
+	}
+	else if (ImpostorType == 2) {
+		MaterialProp = FindFProperty<FObjectProperty>(BPClass, "Billboard Material");
+	}
+	if (MaterialProp) {
+		MaterialInterface = Cast<UMaterialInterface>(MaterialProp->GetObjectPropertyValue_InContainer(BP_Generate_ImposterSprites));
+	}
+	bool bNeedNewMesh = false;
+	int32 MaterialIndex = 0;
+	UMaterialInstanceConstant* MIC = FindObject<UMaterialInstanceConstant>(StaticMesh, TEXT("MIC_Impostor"));
+	if (MIC != nullptr && !StaticMesh->GetStaticMaterials().Contains(MIC)) {
+		MIC->ConditionalBeginDestroy();
+		MIC = nullptr;
+	}
+	if (MIC == nullptr) {
+		UMaterialInstanceConstantFactoryNew* Factory = NewObject<UMaterialInstanceConstantFactoryNew>();
+		Factory->InitialParent = MaterialInterface;
+		MIC = Cast<UMaterialInstanceConstant>(Factory->FactoryCreateNew(UMaterialInstanceConstant::StaticClass(), StaticMesh, "MIC_Impostor", RF_Standalone | RF_Public, NULL, GWarn));
+		MaterialIndex = StaticMesh->GetStaticMaterials().Add(FStaticMaterial(MIC));
+		bNeedNewMesh = true;
+	}
+	FProperty* TargetMapsProp = FindFProperty<FProperty>(BPClass, "TargetMaps");
+	TMap<uint32, UTextureRenderTarget*> TargetMaps;
+	TargetMapsProp->GetValue_InContainer(BP_Generate_ImposterSprites,&TargetMaps);
+	const uint32 BaseColorIndex = 0;
+	const uint32 NormalIndex = 6;
+	UTextureRenderTarget2D* TextureRenderTarget2D = Cast<UTextureRenderTarget2D>(TargetMaps[BaseColorIndex]);
+	UTexture* NewObj = TextureRenderTarget2D->ConstructTexture2D(MIC, "BaseColor", TextureRenderTarget2D->GetMaskedFlags() | RF_Public | RF_Standalone,
+		static_cast<EConstructTextureFlags>(CTF_Default  | CTF_SkipPostEdit), /*InAlphaOverride = */nullptr);
+	NewObj->MarkPackageDirty();
+	NewObj->PostEditChange();
+	MIC->SetTextureParameterValueEditorOnly(FName("BaseColor"), NewObj);
+	
+	TextureRenderTarget2D = Cast<UTextureRenderTarget2D>(TargetMaps[NormalIndex]);
+	NewObj = TextureRenderTarget2D->ConstructTexture2D(MIC, "Normal", TextureRenderTarget2D->GetMaskedFlags() | RF_Public | RF_Standalone,
+		static_cast<EConstructTextureFlags>(CTF_Default | CTF_AllowMips | CTF_SkipPostEdit), /*InAlphaOverride = */nullptr);
+	NewObj->MarkPackageDirty();
+	NewObj->PostEditChange();
+	MIC->SetTextureParameterValueEditorOnly(FName("Normal"), NewObj);
+
+	if (FIntProperty* Prop = FindFProperty<FIntProperty>(BPClass, "FramesXYInternal")) {
+		int FrameXY = Prop->GetSignedIntPropertyValue_InContainer(BP_Generate_ImposterSprites);
+		MIC->SetScalarParameterValueEditorOnly(FName("FramesXY"), FrameXY);
+	}
+	if (FNumericProperty* Prop = FindFProperty<FNumericProperty>(BPClass, "Object Radius")) {
+		double ObjectRadius = 0;
+		Prop->GetValue_InContainer(BP_Generate_ImposterSprites, &ObjectRadius);
+		MIC->SetScalarParameterValueEditorOnly(FName("Default Mesh Size"), ObjectRadius * 2);
+	}
+	if (FProperty* Prop = FindFProperty<FProperty>(BPClass, "Offset Vector")) {
+		FVector OffsetVector;
+		Prop->GetValue_InContainer(BP_Generate_ImposterSprites,&OffsetVector);
+		MIC->SetVectorParameterValueEditorOnly(FName("Pivot Offset"), FLinearColor(OffsetVector));
+	}
+
+	if (bNeedNewMesh) {
+		const int32 BaseLOD = 0;
+		int32 TargetLODIndex = StaticMesh->GetNumSourceModels();
+		FStaticMeshSourceModel* SourceModel = &StaticMesh->AddSourceModel();
+		FMeshDescription& NewMeshDescription = *StaticMesh->CreateMeshDescription(TargetLODIndex);
+		FStaticMeshAttributes(NewMeshDescription).Register();
+
+		UProceduralMeshComponent* ProceduralMeshComp = BP_Generate_ImposterSprites->GetComponentByClass<UProceduralMeshComponent>();
+		NewMeshDescription = BuildMeshDescription(ProceduralMeshComp);
+
+		SourceModel->BuildSettings = StaticMesh->GetSourceModel(BaseLOD).BuildSettings;
+		SourceModel->BuildSettings.bUseHighPrecisionTangentBasis = false;
+		SourceModel->BuildSettings.bUseFullPrecisionUVs = false;
+		SourceModel->BuildSettings.bRecomputeNormals = false;
+		SourceModel->BuildSettings.bRecomputeTangents = false;
+		SourceModel->BuildSettings.bRemoveDegenerates = true;
+		SourceModel->BuildSettings.BuildScale3D = FVector(1, 1, 1);
+		SourceModel->ScreenSize.Default = ScreenSize;
+
+		StaticMesh->CommitMeshDescription(TargetLODIndex);
+		FMeshSectionInfo Info = StaticMesh->GetSectionInfoMap().Get(TargetLODIndex, 0);
+		Info.MaterialIndex = MaterialIndex;
+		StaticMesh->GetSectionInfoMap().Set(TargetLODIndex, 0, Info);
+	}
+
+	StaticMesh->ImportVersion = EImportStaticMeshVersion::LastVersion;
+	StaticMesh->Build();
+
+	StaticMesh->PostEditChange();
+	StaticMesh->MarkPackageDirty();
+	StaticMesh->WaitForPendingInitOrStreaming(true, true);
+
+	FStaticMeshCompilingManager::Get().FinishAllCompilation();
+}
+
 UWorld* UProceduralWorldProcessor::GetWorld() const
 {
 	return GEditor->GetEditorWorldContext().World();
@@ -315,6 +514,7 @@ UWorld* UProceduralWorldProcessor::GetWorld() const
 void UProceduralActorColorationProcessor::Activate()
 {
 	Super::Activate();
+#if ENGINE_MAJOR_VERSION >=5 && ENGINE_MINOR_VERSION >= 4
 	auto GetColorFunc = [this](const UPrimitiveComponent* PrimitiveComponent){
 		return this->Colour(PrimitiveComponent);
 	};
@@ -326,7 +526,7 @@ void UProceduralActorColorationProcessor::Activate()
 	FLevelEditorViewportClient& LevelViewportClient = LevelViewport->GetLevelViewportClient();
 	LevelViewportClient.EngineShowFlags.SetSingleFlag(FEngineShowFlags::SF_ActorColoration, true);
 	LevelViewportClient.Invalidate();
-
+#endif
 	//GEditor->OnLevelActorListChanged().AddUObject(this,&UProceduralActorColorationProcessor::OnLevelActorListChanged);
 	//GEditor->OnLevelActorAdded().AddUObject(this, &UProceduralActorColorationProcessor::OnLevelActorAdded);
 	//GEditor->OnLevelActorDeleted().AddUObject(this, &UProceduralActorColorationProcessor::OnLevelActorRemoved);
@@ -335,6 +535,7 @@ void UProceduralActorColorationProcessor::Activate()
 void UProceduralActorColorationProcessor::Deactivate()
 {
 	Super::Deactivate();
+#if ENGINE_MAJOR_VERSION >=5 && ENGINE_MINOR_VERSION >= 4
 	FActorPrimitiveColorHandler::Get().UnregisterPrimitiveColorHandler(*GetClass()->GetDisplayNameText().ToString());
 
 	FLevelEditorModule& LevelEditor = FModuleManager::GetModuleChecked<FLevelEditorModule>("LevelEditor");
@@ -343,6 +544,7 @@ void UProceduralActorColorationProcessor::Deactivate()
 		LevelViewportClient.EngineShowFlags.SetSingleFlag(FEngineShowFlags::SF_ActorColoration, false);
 		LevelViewportClient.Invalidate();
 	}
+#endif
 	//GEditor->OnLevelActorListChanged().RemoveAll(this);
 	//GEngine->OnLevelActorAdded().RemoveAll(this);
 	//GEngine->OnLevelActorDeleted().RemoveAll(this);
