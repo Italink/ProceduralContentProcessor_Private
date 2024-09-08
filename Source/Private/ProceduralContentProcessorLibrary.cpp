@@ -40,7 +40,7 @@ void UProceduralContentProcessorLibrary::ClearObjectMaterix(FProceduralObjectMat
 	Matrix.bIsDirty = true;
 }
 
-void UProceduralContentProcessorLibrary::AddPropertyFieldWithOwner(FProceduralObjectMatrix& Matrix, UObject* InOwner, UObject* InObject, FName InPropertyName)
+void UProceduralContentProcessorLibrary::AddPropertyFieldBySecondaryObject(FProceduralObjectMatrix& Matrix, UObject* InOwner, UObject* InObject, FName InPropertyName)
 {
 	Matrix.FieldKeys.AddUnique(InPropertyName);
 	auto InfoPtr = Matrix.ObjectInfoMap.Find(InOwner);
@@ -311,17 +311,6 @@ void UProceduralContentProcessorLibrary::SetNaniteMeshEnabled(UStaticMesh* Stati
 	FProperty* ChangedProperty = FindFProperty<FProperty>(UStaticMesh::StaticClass(), GET_MEMBER_NAME_CHECKED(UStaticMesh, NaniteSettings));
 	FPropertyChangedEvent Event(ChangedProperty);
 	StaticMesh->PostEditChangeProperty(Event);
-}
-
-void UProceduralContentProcessorLibrary::GenerateStaticMeshLODs(UStaticMesh* InMesh, FName LODGroup, int LODCount)
-{
-	if (LODGroup != InMesh->LODGroup ||
-		(LODGroup == InMesh->LODGroup && InMesh->GetNumSourceModels() != LODCount)) {
-		InMesh->Modify();
-		InMesh->SetLODGroup(LODGroup);
-		InMesh->SetNumSourceModels(LODCount);
-		InMesh->GenerateLodsInPackage();
-	}
 }
 
 bool UProceduralContentProcessorLibrary::IsMaterialHasTimeNode(AStaticMeshActor* StaticMeshActor)

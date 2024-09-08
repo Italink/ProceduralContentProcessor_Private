@@ -84,13 +84,13 @@ public:
 	static void ClearObjectMaterix(UPARAM(ref) FProceduralObjectMatrix& Matrix);
 
 	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
-	static void AddPropertyField(UPARAM(ref) FProceduralObjectMatrix& Matrix, UObject* InObject, FName InPropertyName);
+	static void AddPropertyField(UPARAM(ref) FProceduralObjectMatrix& Matrix, UObject* InOwner, FName InPropertyName);
 
 	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
-	static void AddPropertyFieldWithOwner(UPARAM(ref) FProceduralObjectMatrix& Matrix, UObject* InOwner, UObject* InObject, FName InPropertyName);
+	static void AddPropertyFieldBySecondaryObject(UPARAM(ref) FProceduralObjectMatrix& Matrix, UObject* InOwner, UObject* InSecondaryObject, FName InSecondaryObjectPropertyName);
 
 	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
-	static void AddTextField(UPARAM(ref) FProceduralObjectMatrix& Matrix, UObject* InObject, FName InFieldName, FString InFieldValue);
+	static void AddTextField(UPARAM(ref) FProceduralObjectMatrix& Matrix, UObject* InOwner, FName InFieldName, FString InFieldValue);
 
 
 	// Object Interface:
@@ -113,6 +113,11 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
 	static TSet<UObject*> GetAssetReferences(UObject* Object, const TArray<UClass*>& IgnoreClasses, bool bIncludeDefaultRefs = false);
 	
+	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
+	static bool IsGeneratedByBlueprint(UObject* InObject);
+
+	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
+	static UObject* CopyProperties(UObject* OldObject, UObject* NewObject);
 
 	// Editor Interface:
 
@@ -165,19 +170,10 @@ public:
 	static void SetNaniteMeshEnabled(UStaticMesh* InMesh, bool bEnabled);
 
 	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
-	static void GenerateStaticMeshLODs(UStaticMesh* InMesh, FName LODGroup, int LODCount);
-
-	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
 	static bool IsMaterialHasTimeNode(AStaticMeshActor* InActor);
 
 	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
 	static bool MatchString(FString InString,const TArray<FString>& IncludeList, const TArray<FString>& ExcludeList);
-
-	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
-	static bool IsGeneratedByBlueprint(UObject* InObject);
-
-	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
-	static UObject* CopyProperties(UObject* OldObject, UObject* NewObject);
 
 	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
 	static UStaticMesh* GetComplexCollisionMesh(UStaticMesh* InMesh);

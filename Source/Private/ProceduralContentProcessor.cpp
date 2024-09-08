@@ -33,7 +33,7 @@ void UProceduralContentProcessor::Activate()
 
 void UProceduralContentProcessor::Tick(const float InDeltaTime)
 {
-	ReceiveTick();
+	ReceiveTick(InDeltaTime);
 }
 
 void UProceduralContentProcessor::Deactivate()

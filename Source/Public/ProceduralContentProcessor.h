@@ -12,13 +12,13 @@ public:
 	void ReceiveActivate();
 
 	UFUNCTION(BlueprintImplementableEvent, Category = "ProceduralContentProcessor", meta = (DisplayName = "Tick"))
-	void ReceiveTick();
+	void ReceiveTick(float DeltaTime);
 
 	UFUNCTION(BlueprintImplementableEvent, Category = "ProceduralContentProcessor", meta = (DisplayName = "Deactivate"))
 	void ReceiveDeactivate();
 
 	UFUNCTION(BlueprintImplementableEvent, Category = "ProceduralContentProcessor", meta = (DisplayName = "PostEditChangeProperty"))
-	void ReceivePostEditChangeProperty(FName InPropertyName);
+	void ReceivePostEditChangeProperty(FName PropertyName);
 
 	virtual void Activate();
 
