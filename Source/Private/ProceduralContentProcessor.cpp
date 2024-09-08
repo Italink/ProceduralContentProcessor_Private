@@ -61,10 +61,10 @@ TSharedPtr<SWidget> UProceduralContentProcessor::BuildWidget()
 	DetailsViewArgs.ViewIdentifier = FName("BlueprintDefaults");
 	auto DetailView = EditModule.CreateDetailView(DetailsViewArgs);
 	DetailView->SetIsPropertyVisibleDelegate(FIsPropertyVisible::CreateLambda([](const FPropertyAndParent& Node) {
-		return !(Node.Property.HasAnyPropertyFlags(EPropertyFlags::CPF_AdvancedDisplay) || Node.Property.HasAnyPropertyFlags(EPropertyFlags::CPF_DisableEditOnInstance));
+		return !(Node.Property.HasAnyPropertyFlags(EPropertyFlags::CPF_Transient) || Node.Property.HasAnyPropertyFlags(EPropertyFlags::CPF_DisableEditOnInstance));
 	}));
 	DetailView->SetIsPropertyReadOnlyDelegate(FIsPropertyReadOnly::CreateLambda([](const FPropertyAndParent& Node) {
-		return Node.Property.HasAnyPropertyFlags(EPropertyFlags::CPF_DisableEditOnInstance);
+		return Node.Property.HasAnyPropertyFlags(EPropertyFlags::CPF_DisableEditOnInstance) || Node.Property.HasAnyPropertyFlags(EPropertyFlags::CPF_BlueprintReadOnly);
 	}));
 	DetailView->SetObject(this);
 	return DetailView;
@@ -80,17 +80,7 @@ TScriptInterface<IAssetRegistry> UProceduralAssetProcessor::GetAssetRegistry()
 	return ReturnParam;
 }
 
-TArray<AActor*> UProceduralWorldProcessor::GetLoadedActorsByClass(TSubclassOf<AActor> ActorClass)
-{
-	TArray<AActor*> OutActors;
-	if (!GEditor)
-		return OutActors;
-	UWorld* World = GEditor->GetEditorWorldContext().World();
-	UGameplayStatics::GetAllActorsOfClass(World, ActorClass, OutActors);
-	return OutActors;
-}
-
-TArray<AActor*> UProceduralWorldProcessor::GetLoadedActorsByName(FString InName, bool bCompleteMatching /*= false*/)
+TArray<AActor*> UProceduralWorldProcessor::GetAllActorsByName(FString InName, bool bCompleteMatching /*= false*/)
 {
 	TArray<AActor*> OutActors;
 	if (!GEditor)
@@ -116,57 +106,13 @@ TArray<AActor*> UProceduralWorldProcessor::GetLoadedActorsByName(FString InName,
 	return OutActors;
 }
 
-TArray<AStaticMeshActor*> UProceduralWorldProcessor::GetLoadedStaticMeshActorsByAsset(TArray<UStaticMesh*> InMeshs)
-{
-	TArray<AStaticMeshActor*> OutActors;
-	if (!GEditor)
-		return OutActors;
-	UWorld* World = GEditor->GetEditorWorldContext().World();
-	UWorldPartition* WorldPartition = World->GetWorldPartition();
-	TArray<AActor*> Actors;
-	UGameplayStatics::GetAllActorsOfClass(World, AStaticMeshActor::StaticClass(), Actors);
-	for (auto Actor : Actors) {
-		if (AStaticMeshActor* StaticMeshActor = Cast<AStaticMeshActor>(Actor)) {
-			if (InMeshs.Contains(StaticMeshActor->GetStaticMeshComponent()->GetStaticMesh())) {
-				OutActors.Add(StaticMeshActor);
-			}
-		}
-	}
-	return OutActors;
-}
-
-TArray<UStaticMesh*> UProceduralWorldProcessor::GetLoadedStaticMesh(bool bContainStaticMesh/*= true*/, bool bContainInstancedStaticMesh /*= true*/)
-{
-	TArray<UStaticMesh*> StaticMesh;
-	auto Actors = GetLoadedActorsByClass(AActor::StaticClass());
-	for (auto Actor : Actors) {
-		if (bContainStaticMesh) {
-			TArray<UStaticMeshComponent*> StaicMeshComps;
-			Actor->GetComponents(StaicMeshComps, true);
-			for (auto StaticMeshComp : StaicMeshComps) {
-				if (StaticMeshComp->GetStaticMesh()) {
-					StaticMesh.AddUnique(StaticMeshComp->GetStaticMesh());
-				}
-			}
-		}
-		if (bContainInstancedStaticMesh) {
-			TArray<UInstancedStaticMeshComponent*> InstanceComps;
-			Actor->GetComponents(InstanceComps, true);
-			for (auto InstStaticMeshComp : InstanceComps) {
-				if (InstStaticMeshComp->GetStaticMesh()) {
-					StaticMesh.AddUnique(InstStaticMeshComp->GetStaticMesh());
-				}
-			}
-		}
-	}
-	return StaticMesh;
-}
-
 void UProceduralWorldProcessor::DisableInstancedFoliageMeshShadow(TArray<UStaticMesh*> InMeshes)
 {
 	if (!InMeshes.IsEmpty()) {
 		GEditor->BeginTransaction(LOCTEXT("DisableInstancedFoliageMeshShadow", "Disable Instanced Foliage Mesh Shadow"));
-		auto Actors = GetLoadedActorsByClass(AInstancedFoliageActor::StaticClass());
+		TArray<AActor*> Actors;
+		UWorld* World = GEditor->GetEditorWorldContext().World();
+		UGameplayStatics::GetAllActorsOfClass(World, AInstancedFoliageActor::StaticClass(), Actors);
 		for (auto Actor : Actors) {
 			TArray<UInstancedStaticMeshComponent*> InstanceComps;
 			Actor->GetComponents(InstanceComps, true);

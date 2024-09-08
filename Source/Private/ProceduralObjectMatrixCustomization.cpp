@@ -168,6 +168,8 @@ void FPropertyTypeCustomization_ProceduralObjectMatrix::OnMouseButtonDoubleClick
 }
 
 void FPropertyTypeCustomization_ProceduralObjectMatrix::OnSearchBoxTextCommitted(const FText& InNewText, ETextCommit::Type InTextCommit) {
+	if (ProceduralObjectMatrix == nullptr || ProceduralObjectMatrix->ObjectInfoListView == nullptr)
+		return;
 	if (InNewText.IsEmpty()) {
 		ProceduralObjectMatrix->ObjectInfoListView->SetListItemsSource(ProceduralObjectMatrix->ObjectInfoList);
 		CurrInfoList = &ProceduralObjectMatrix->ObjectInfoList;

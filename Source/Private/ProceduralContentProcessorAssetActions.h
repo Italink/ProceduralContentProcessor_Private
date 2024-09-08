@@ -33,6 +33,9 @@ public:
 	float SortPriority;
 
 	UPROPERTY(EditAnywhere, Category = ProceduralContentProcessor)
+	FString DocumentHyperlink;
+
+	UPROPERTY(EditAnywhere, Category = ProceduralContentProcessor)
 	TSubclassOf<UUserWidget> OverrideUMGClass = nullptr;
 
 	UPROPERTY()

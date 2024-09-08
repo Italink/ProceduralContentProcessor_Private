@@ -83,6 +83,8 @@ private:
 	TArray<TSharedPtr<FProcessorOutlinerField>> TopLevelProcessorField;
 	TSharedPtr<SComboButton> ProcessorComboButton;
 	TSharedPtr<STreeView<TSharedPtr<FProcessorOutlinerField>>> ProcessorTreeView;
+
+	TSharedPtr<SBox> ProcessorDocumentationContainter;
 	TSharedPtr<SBox> ProcessorWidgetContainter;
 
 	bool bNeedRefreshProcessorList = false;

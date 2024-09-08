@@ -53,6 +53,7 @@ public class ProceduralContentProcessor : ModuleRules
                 "ModelingComponentsEditorOnly",
                 "InteractiveToolsFramework",
                 "EditorInteractiveToolsFramework",
+                "StaticMeshEditor",
                 "StaticMeshDescription",
                 "MeshDescription",
                 "MeshDescriptionOperations",

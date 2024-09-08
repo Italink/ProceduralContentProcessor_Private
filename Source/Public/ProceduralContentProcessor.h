@@ -47,16 +47,7 @@ class PROCEDURALCONTENTPROCESSOR_API UProceduralWorldProcessor: public UProcedur
 	GENERATED_BODY()
 public:
 	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
-	static TArray<AActor*> GetLoadedActorsByClass(TSubclassOf<AActor> ActorClass);
-
-	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
-	static TArray<AActor*> GetLoadedActorsByName(FString InName, bool bCompleteMatching = false);
-
-	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
-	static TArray<AStaticMeshActor*> GetLoadedStaticMeshActorsByAsset(TArray<UStaticMesh*> InMeshs);
-
-	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
-	static TArray<UStaticMesh*> GetLoadedStaticMesh(bool bContainStaticMesh = true, bool bContainInstancedStaticMesh = true);
+	static TArray<AActor*> GetAllActorsByName(FString InName, bool bCompleteMatching = false);
 
 	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
 	static void DisableInstancedFoliageMeshShadow(TArray<UStaticMesh*> InMeshes);

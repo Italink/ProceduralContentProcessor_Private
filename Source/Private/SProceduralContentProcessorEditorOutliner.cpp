@@ -17,6 +17,7 @@
 #include "ProceduralContentProcessorSettings.h"
 #include "PropertyCustomizationHelpers.h"
 #include "Styling/SlateIconFinder.h"
+#include "IDocumentation.h"
 
 SProceduralContentProcessorEditorOutliner::~SProceduralContentProcessorEditorOutliner()
 {
@@ -50,6 +51,15 @@ void SProceduralContentProcessorEditorOutliner::Construct(const FArguments& InAr
 			]
 			+ SHorizontalBox::Slot()
 			.AutoWidth()
+			.Padding(2)
+			.HAlign(HAlign_Right)
+			[
+				SAssignNew(ProcessorDocumentationContainter, SBox)
+				/*IDocumentation::Get()->CreateAnchor("https://www.baidu.com/", FString(), "Hello")*/
+			]
+			+ SHorizontalBox::Slot()
+			.AutoWidth()
+			.Padding(2)
 			.HAlign(HAlign_Right)
 			[
 				PropertyCustomizationHelpers::MakeBrowseButton(
@@ -187,6 +197,7 @@ void SProceduralContentProcessorEditorOutliner::RefreshProcessorList()
 void SProceduralContentProcessorEditorOutliner::SetCurrentProcessor(UClass* InProcessorClass, bool bSaveConfig)
 {
 	if (CurrentProcessor) {
+		CurrentProcessor->SaveConfig(CPF_Config, *CurrentProcessor->GetDefaultConfigFilename());
 		CurrentProcessor->Deactivate();
 	}
 	if (bSaveConfig) {
@@ -198,10 +209,24 @@ void SProceduralContentProcessorEditorOutliner::SetCurrentProcessor(UClass* InPr
 		ProcessorWidgetContainter->SetContent(CurrentProcessor->BuildWidget().ToSharedRef());
 		CurrentProcessor->Activate();
 		CurrentProcessorText = InProcessorClass->GetDisplayNameText();
+		FString DocumentHyperlink;
+		if (UProceduralContentProcessorBlueprint* Blueprint = Cast<UProceduralContentProcessorBlueprint>(InProcessorClass->ClassGeneratedBy)){
+			DocumentHyperlink = Blueprint->DocumentHyperlink;
+		}
+		else {
+			DocumentHyperlink = InProcessorClass->GetMetaData("DocumentHyperlink");
+		}
+		if (DocumentHyperlink.IsEmpty()) {
+			ProcessorDocumentationContainter->SetContent(SNullWidget::NullWidget);
+		}
+		else {
+			ProcessorDocumentationContainter->SetContent(IDocumentation::Get()->CreateAnchor(DocumentHyperlink, DocumentHyperlink, "Document"));
+		}
 	}
 	else {
 		CurrentProcessor = nullptr;
 		CurrentProcessorText = FText();
+		ProcessorDocumentationContainter->SetContent(SNullWidget::NullWidget);
 		ProcessorWidgetContainter->SetContent(SNullWidget::NullWidget);
 	}
 }
