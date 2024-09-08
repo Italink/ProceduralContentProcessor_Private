@@ -155,6 +155,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
 	static void ClearAllSlowTask();
 
+
 	// Asset Interface:
 	
 	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
