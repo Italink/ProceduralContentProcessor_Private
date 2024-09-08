@@ -1,5 +1,7 @@
 # Procedural Content Processor
-**Procedural Content Processor** 是一个小巧的 Unreal Engine 插件，它旨在以程序化的方式来管理引擎中的内容（对象，资产，Actor，关卡），尤其是在中大型项目的管理中，这样的管理思想是非常有用的。
+**Procedural Content Processor** 是一个小巧的 Unreal Engine 插件，它旨在以程序化的方式来管理引擎中的内容（对象，资产，Actor）。
+
+如果希望通过编写逻辑来管理项目内容，而不是只能通过编辑器点点点，那么这个插件正是你想要的。
 
 ## 功能说明
 
@@ -39,7 +41,7 @@
 
 以此为契机，我们可以编写大量的编辑器工具。
 
-程序化内容处理器的一些蓝图配置将会影响到的编辑器大纲：
+程序化内容处理器的一些蓝图配置将会影响到编辑器大纲的显示：
 
 - **Sort Priority**：排序优先级，影响编辑器大纲中下拉框的排序。
 - **Document Hyperlink**：该处理器的文档链接，点击编辑器大纲上的 【? 按钮】将打开对应的网址。
@@ -50,10 +52,10 @@
 
 ![image-20240908160746183](Resources/image-20240908160746183.png)
 
-蓝图属性中的一些配置也会有所影响：
+蓝图属性中的一些配置会对细节面板有所影响：
 
 - **可编辑实例**：只有勾选了可编辑实例的属性，才能在对象的细节面板上编辑，否则只能在蓝图编辑器中修改默认值。
-- **只读蓝图**：勾选后，该属性将变得不可编辑，但会预览
+- **只读蓝图**：勾选后，该属性将变得不可编辑，但会预览。
 - **配置变量**：勾选后，该属性的值将会被存到配置文件中，下次启动处理器时会读取之前的配置。
 
 ![image-20240908163158884](Resources/image-20240908163158884.png)
@@ -117,6 +119,10 @@ UE提供了一个 **属性矩阵** 的功能可以批量更改资产的某些属
 - `void AddPropertyFieldBySecondaryObject(Owner，SecondaryObject，SecondaryObjectPropertyName)`：添加属性编辑器，意味着`{Owner}`行，`{SecondaryObjectPropertyName}`列，将被填充为 【SecondaryObject对象SecondaryObjectPropertyName属性】的编辑器。
 
 ![image-20240908165948105](Resources/image-20240908165948105.png)
+
+这是引擎中的一个使用示例：
+
+![image-20240908171543851](Resources/image-20240908171543851.png)
 
 ### 其他
 
