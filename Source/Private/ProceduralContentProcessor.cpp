@@ -136,6 +136,7 @@ TArray<AActor*> UProceduralWorldProcessor::BreakISM(AActor* InISMActor, bool bDe
 	ULayersSubsystem* LayersSubsystem = GEditor->GetEditorSubsystem<ULayersSubsystem>();
 	TArray<UInstancedStaticMeshComponent*> InstanceComps;
 	InISMActor->GetComponents(InstanceComps, true);
+	UWorld* World = InISMActor->GetWorld();
 	if (!InstanceComps.IsEmpty()) {
 		for (auto& ISMC : InstanceComps) {
 			for(int i = 0; i< ISMC->GetInstanceCount(); i++){
@@ -143,13 +144,14 @@ TArray<AActor*> UProceduralWorldProcessor::BreakISM(AActor* InISMActor, bool bDe
 				SpawnInfo.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 				FTransform Transform;
 				ISMC->GetInstanceTransform(i, Transform,true);
-				auto NewActor = InISMActor->GetWorld()->SpawnActor<AStaticMeshActor>(AStaticMeshActor::StaticClass(), Transform, SpawnInfo);
+				auto NewActor = World->SpawnActor<AStaticMeshActor>(AStaticMeshActor::StaticClass(), Transform, SpawnInfo);
 				NewActor->GetStaticMeshComponent()->SetStaticMesh(ISMC->GetStaticMesh());
 				NewActor->SetActorLabel(InISMActor->GetActorLabel());
 				auto Materials = ISMC->GetMaterials();
 				for (int j = 0; j < Materials.Num(); j++) 
 					NewActor->GetStaticMeshComponent()->SetMaterial(j, Materials[j]);
 				NewActor->Modify();
+				NewActor->SetActorLabel(MakeUniqueObjectName(World, AStaticMeshActor::StaticClass(), *ISMC->GetStaticMesh()->GetName()).ToString());
 				Actors.Add(NewActor);
 				LayersSubsystem->InitializeNewActorLayers(NewActor);
 				const bool bCurrentActorSelected = GUnrealEd->GetSelectedActors()->IsSelected(InISMActor);
@@ -372,9 +374,19 @@ void UProceduralWorldProcessor::AppendImposterToLODChain(AStaticMeshActor* InSta
 	bool bNeedNewMesh = false;
 	int32 MaterialIndex = 0;
 	UMaterialInstanceConstant* MIC = FindObject<UMaterialInstanceConstant>(StaticMesh, TEXT("MIC_Impostor"));
-	if (MIC != nullptr && !StaticMesh->GetStaticMaterials().Contains(MIC)) {
-		MIC->ConditionalBeginDestroy();
-		MIC = nullptr;
+	auto MICS = StaticMesh->GetStaticMaterials();
+	if (MIC != nullptr) {
+		if (StaticMesh->GetStaticMaterials().Contains(MIC)) {
+			const auto& LastTriangles = StaticMesh->GetNumTriangles(StaticMesh->GetNumSourceModels() - 1);
+			if(LastTriangles != 8){
+				MaterialIndex = StaticMesh->GetStaticMaterials().IndexOfByKey(MIC);
+				bNeedNewMesh = true;
+			}
+		}
+		else {
+			MIC->ConditionalBeginDestroy();
+			MIC = nullptr;
+		}
 	}
 	if (MIC == nullptr) {
 		UMaterialInstanceConstantFactoryNew* Factory = NewObject<UMaterialInstanceConstantFactoryNew>();
