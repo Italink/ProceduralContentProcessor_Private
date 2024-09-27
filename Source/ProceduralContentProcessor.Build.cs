@@ -22,6 +22,7 @@ public class ProceduralContentProcessor : ModuleRules
 			{
                 "CoreUObject",
                 "Engine",
+                "RHI",
                 "BlueprintGraph",
                 "UMG",
                 "UMGEditor",
@@ -60,6 +61,9 @@ public class ProceduralContentProcessor : ModuleRules
                 "MeshBoneReduction",
                 "MeshPaint",
                 "ProceduralMeshComponent",
+                "NiagaraEditor",
+                "RenderCore",
+                "ShaderFormatVectorVM"
 				// ... add private dependencies that you statically link with here ...	
 			}
 			);

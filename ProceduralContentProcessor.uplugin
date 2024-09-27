@@ -24,7 +24,7 @@
 		{
 			"Name": "ProceduralContentProcessor",
 			"Type": "Editor",
-			"LoadingPhase": "Default"
+			"LoadingPhase": "PostConfigInit"
 		}
 	]
 }

@@ -34,19 +34,22 @@ const FName LevelEditorProceduralContentProcessorBrowser(TEXT("LevelEditorProced
 
 void FProceduralContentProcessorModule::StartupModule()
 {
-	IAssetTools& AssetTools = FModuleManager::LoadModuleChecked<FAssetToolsModule>("AssetTools").Get();
-	AssetTools.RegisterAdvancedAssetCategory("ProceduralContentProcessor", LOCTEXT("ProceduralContentProcessor", "Procedural Content Processor"));
+	//IAssetTools& AssetTools = FModuleManager::LoadModuleChecked<FAssetToolsModule>("AssetTools").Get();
+	//AssetTools.RegisterAdvancedAssetCategory("ProceduralContentProcessor", LOCTEXT("ProceduralContentProcessor", "Procedural Content Processor"));
 
-	FPropertyEditorModule& PropertyModule = FModuleManager::GetModuleChecked<FPropertyEditorModule>("PropertyEditor");
-	PropertyModule.RegisterCustomPropertyTypeLayout(FProceduralObjectMatrix::StaticStruct()->GetFName(), FOnGetPropertyTypeCustomizationInstance::CreateStatic(&FPropertyTypeCustomization_ProceduralObjectMatrix::MakeInstance));
+	//FPropertyEditorModule& PropertyModule = FModuleManager::GetModuleChecked<FPropertyEditorModule>("PropertyEditor");
+	//PropertyModule.RegisterCustomPropertyTypeLayout(FProceduralObjectMatrix::StaticStruct()->GetFName(), FOnGetPropertyTypeCustomizationInstance::CreateStatic(&FPropertyTypeCustomization_ProceduralObjectMatrix::MakeInstance));
 
-	ProceduralAssetProcessorAssetActions = MakeShared<FProceduralAssetProcessorAssetActions>();
-	AssetTools.RegisterAssetTypeActions(ProceduralAssetProcessorAssetActions.ToSharedRef());
-	ProceduralWorldProcessorAssetActions = MakeShared<FProceduralWorldProcessorAssetActions>();
-	AssetTools.RegisterAssetTypeActions(ProceduralWorldProcessorAssetActions.ToSharedRef());
-	ProceduralActorColorationProcessorAssetActions = MakeShared<FProceduralActorColorationProcessorAssetActions>();
-	AssetTools.RegisterAssetTypeActions(ProceduralActorColorationProcessorAssetActions.ToSharedRef());
-	
+	//ProceduralAssetProcessorAssetActions = MakeShared<FProceduralAssetProcessorAssetActions>();
+	//AssetTools.RegisterAssetTypeActions(ProceduralAssetProcessorAssetActions.ToSharedRef());
+	//ProceduralWorldProcessorAssetActions = MakeShared<FProceduralWorldProcessorAssetActions>();
+	//AssetTools.RegisterAssetTypeActions(ProceduralWorldProcessorAssetActions.ToSharedRef());
+	//ProceduralActorColorationProcessorAssetActions = MakeShared<FProceduralActorColorationProcessorAssetActions>();
+	//AssetTools.RegisterAssetTypeActions(ProceduralActorColorationProcessorAssetActions.ToSharedRef());
+
+	FString PluginShaderDir = FPaths::Combine(IPluginManager::Get().FindPlugin(TEXT("ProceduralContentProcessor"))->GetBaseDir(), TEXT("Shaders"));
+	AddShaderSourceDirectoryMapping(TEXT("/Plugins/ProceduralContentProcessor"), PluginShaderDir);
+
 	//FLevelEditorModule& LevelEditorModule = FModuleManager::GetModuleChecked<FLevelEditorModule>("LevelEditor");
 	//LevelEditorModule.OnTabManagerChanged().AddLambda([this]() {
 	//	FLevelEditorModule& LevelEditorModule = FModuleManager::GetModuleChecked<FLevelEditorModule>("LevelEditor");
