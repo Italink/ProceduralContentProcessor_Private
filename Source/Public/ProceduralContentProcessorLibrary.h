@@ -52,10 +52,10 @@ struct FStaticMeshLODInfo
 {
 	GENERATED_BODY()
 public:
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	bool bUseDistance;
 
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	bool bEnableBuildSetting;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditConditionHides, HideEditConditionToggle, EditCondition = "!bUseDistance"))
@@ -64,7 +64,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (HideEditConditionToggle, EditCondition = "bUseDistance"))
 	float Distance;
 
-	UPROPERTY(EditAnywhere, Category=BuildSettings, meta = (EditConditionHides, HideEditConditionToggle, EditCondition = "bEnableBuildSetting"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=BuildSettings, meta = (EditConditionHides, HideEditConditionToggle, EditCondition = "bEnableBuildSetting"))
 	FMeshBuildSettings BuildSettings;
 
 	/** Reduction settings to apply when building render data. */
@@ -118,6 +118,10 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
 	static UObject* CopyProperties(UObject* OldObject, UObject* NewObject);
+
+	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor", CustomThunk, meta = (CustomStructureParam = "Value", AutoCreateRefTerm = "Value"))
+	static void SetObjectPropertyByName(UObject* Object, FName PropertyName, const int& Value);
+	DECLARE_FUNCTION(execSetObjectPropertyByName);
 
 	// Editor Interface:
 
@@ -195,6 +199,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
 	static float GetLodDistance(UStaticMesh* InStaticMesh, int32 LODIndex);
+
+	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
+	static float ConvertDistanceToScreenSize(float ObjectSphereRadius, float Distance);
 
 	static TArray<TSharedPtr<FSlowTask>> SlowTasks;
 };

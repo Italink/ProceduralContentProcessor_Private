@@ -203,7 +203,7 @@ AActor* UProceduralWorldProcessor::MergeISM(TArray<AActor*> InSourceActors, TSub
 	Transform.SetLocation(Bounds.Origin);
 	auto NewISMActor = World->SpawnActor<AActor>(AActor::StaticClass(),Transform, SpawnInfo);
 	USceneComponent* RootComponent = NewObject<USceneComponent>(NewISMActor, USceneComponent::GetDefaultSceneRootVariableName(), RF_Transactional);
-	RootComponent->Mobility = EComponentMobility::Movable;
+	RootComponent->Mobility = EComponentMobility::Static;
 	RootComponent->bVisualizeComponent = true;
 	NewISMActor->SetRootComponent(RootComponent);
 	NewISMActor->AddInstanceComponent(RootComponent);
@@ -211,7 +211,8 @@ AActor* UProceduralWorldProcessor::MergeISM(TArray<AActor*> InSourceActors, TSub
 	RootComponent->RegisterComponent();
 
 	for (const auto& InstancedInfo : InstancedMap) {
-		UInstancedStaticMeshComponent* ISMComponent = NewObject<UInstancedStaticMeshComponent>(NewISMActor, *InstancedInfo.Key->GetName(), RF_Transactional);
+		UInstancedStaticMeshComponent* ISMComponent = NewObject<UInstancedStaticMeshComponent>(NewISMActor, InISMClass, *InstancedInfo.Key->GetName(), RF_Transactional);
+		ISMComponent->Mobility = EComponentMobility::Static;
 		NewISMActor->AddInstanceComponent(ISMComponent);
 		ISMComponent->AttachToComponent(RootComponent, FAttachmentTransformRules::KeepRelativeTransform);
 		ISMComponent->OnComponentCreated();
@@ -403,6 +404,7 @@ void UProceduralWorldProcessor::AppendImposterToLODChain(AStaticMeshActor* InSta
 	UTextureRenderTarget2D* TextureRenderTarget2D = Cast<UTextureRenderTarget2D>(TargetMaps[BaseColorIndex]);
 	UTexture* NewObj = TextureRenderTarget2D->ConstructTexture2D(MIC, "BaseColor", TextureRenderTarget2D->GetMaskedFlags() | RF_Public | RF_Standalone,
 		static_cast<EConstructTextureFlags>(CTF_Default  | CTF_SkipPostEdit), /*InAlphaOverride = */nullptr);
+	NewObj->CompressionSettings = TextureCompressionSettings::TC_Default;
 	NewObj->MarkPackageDirty();
 	NewObj->PostEditChange();
 	MIC->SetTextureParameterValueEditorOnly(FName("BaseColor"), NewObj);
@@ -410,6 +412,7 @@ void UProceduralWorldProcessor::AppendImposterToLODChain(AStaticMeshActor* InSta
 	TextureRenderTarget2D = Cast<UTextureRenderTarget2D>(TargetMaps[NormalIndex]);
 	NewObj = TextureRenderTarget2D->ConstructTexture2D(MIC, "Normal", TextureRenderTarget2D->GetMaskedFlags() | RF_Public | RF_Standalone,
 		static_cast<EConstructTextureFlags>(CTF_Default | CTF_AllowMips | CTF_SkipPostEdit), /*InAlphaOverride = */nullptr);
+	NewObj->CompressionSettings = TextureCompressionSettings::TC_Default;
 	NewObj->MarkPackageDirty();
 	NewObj->PostEditChange();
 	MIC->SetTextureParameterValueEditorOnly(FName("Normal"), NewObj);

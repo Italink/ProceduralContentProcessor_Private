@@ -367,6 +367,22 @@ UObject* UProceduralContentProcessorLibrary::CopyProperties(UObject* OldObject, 
 	return NewObject;
 }
 
+DEFINE_FUNCTION(UProceduralContentProcessorLibrary::execSetObjectPropertyByName)
+{
+	P_GET_PROPERTY(FObjectProperty, Param_Object);
+	P_GET_PROPERTY(FNameProperty, Param_PropertyName);
+	Stack.StepCompiledIn<FProperty>(nullptr);
+	FProperty* SourceProperty = Stack.MostRecentProperty;
+	void* SourceValuePtr = Stack.MostRecentPropertyAddress;
+	P_FINISH;
+	if (Param_Object) {
+		if (FProperty* Property = FindFProperty<FProperty>(Param_Object->GetClass(), Param_PropertyName)) {
+			Property->SetValue_InContainer(Param_Object, SourceValuePtr);
+			return;
+		}
+	}
+}
+
 UStaticMesh* UProceduralContentProcessorLibrary::GetComplexCollisionMesh(UStaticMesh* InMesh)
 {
 	if (!InMesh)
@@ -498,11 +514,21 @@ float UProceduralContentProcessorLibrary::GetLodDistance(UStaticMesh* InStaticMe
 	float ScreenSize = GetLodScreenSize(InStaticMesh, LODIndex);
 	const float FOVRad = FOV * (float)UE_PI / 360.0f;
 	const FMatrix ProjectionMatrix = FPerspectiveMatrix(FOVRad, 1920, 1080, 0.01f);
-
 	const float ScreenMultiple = FMath::Max(0.5f * ProjectionMatrix.M[0][0], 0.5f * ProjectionMatrix.M[1][1]);
 	const float ScreenRadius = FMath::Max(UE_SMALL_NUMBER, ScreenSize * 0.5f);
-
 	return ComputeBoundsDrawDistance(ScreenSize, InStaticMesh->GetBounds().SphereRadius, ProjectionMatrix);
+}
+
+float UProceduralContentProcessorLibrary::ConvertDistanceToScreenSize(float ObjectSphereRadius, float Distance)
+{
+	const float FOV = 60.0f;
+	const float FOVRad = FOV * (float)UE_PI / 360.0f;
+	const FMatrix ProjectionMatrix = FPerspectiveMatrix(FOVRad, 1920, 1080, 0.01f);
+	const float ScreenMultiple = FMath::Max(0.5f * ProjectionMatrix.M[0][0], 0.5f * ProjectionMatrix.M[1][1]);
+	if (Distance <= 0.000001f) {
+		return 2.0f;
+	}
+	return  2.0f * ScreenMultiple * ObjectSphereRadius / FMath::Max(1.0f, Distance);
 }
 
 TArray<TSharedPtr<FSlowTask>> UProceduralContentProcessorLibrary::SlowTasks;
