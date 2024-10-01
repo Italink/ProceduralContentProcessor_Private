@@ -19,8 +19,6 @@
 
 void SHLSLCodeEditor::Construct(const FArguments& InArgs, FText InHLSLCode)
 {
-	GeneratedCode.Hlsl = InHLSLCode;
-
 	SyntaxHighlighter = FHLSLSyntaxHighlighterMarshaller::Create(
 		FHLSLSyntaxHighlighterMarshaller::FSyntaxTextStyle(FNiagaraEditorStyle::Get().GetWidgetStyle<FTextBlockStyle>("SyntaxHighlight.HLSL.Normal"),
 		FNiagaraEditorStyle::Get().GetWidgetStyle<FTextBlockStyle>("SyntaxHighlight.HLSL.Operator"),
@@ -148,7 +146,7 @@ void SHLSLCodeEditor::Construct(const FArguments& InArgs, FText InHLSLCode)
 			];
 	}
 
-	GeneratedCode.Text->SetText(GeneratedCode.Hlsl);
+	GeneratedCode.Text->SetText(InHLSLCode);
 
 	TextBodyContainer->AddSlot()
 		[
@@ -218,34 +216,34 @@ void SHLSLCodeEditor::DoSearch(const FText& InFilterText)
 	}
 
 	ActiveFoundTextEntries.Empty();
-	for (int32 i = 0; i < GeneratedCode.HlslByLines.Num(); i++)
-	{
-		const FString& Line = GeneratedCode.HlslByLines[i];
-		int32 FoundPos = Line.Find(SearchString, ESearchCase::IgnoreCase);
-		while (FoundPos != INDEX_NONE && ActiveFoundTextEntries.Num() < 1000) // guard against a runaway loop
-		{
-			ActiveFoundTextEntries.Add(FTextLocation(i, FoundPos));
-			int32 LastPos = FoundPos + SearchString.Len();
-			if (LastPos < Line.Len())
-			{
-				FoundPos = Line.Find(SearchString, ESearchCase::IgnoreCase, ESearchDir::FromStart, LastPos);
-			}
-			else
-			{
-				FoundPos = INDEX_NONE;
-			}
-		}
-	}
+	//for (int32 i = 0; i < GeneratedCode.HlslByLines.Num(); i++)
+	//{
+	//	const FString& Line = GeneratedCode.HlslByLines[i];
+	//	int32 FoundPos = Line.Find(SearchString, ESearchCase::IgnoreCase);
+	//	while (FoundPos != INDEX_NONE && ActiveFoundTextEntries.Num() < 1000) // guard against a runaway loop
+	//	{
+	//		ActiveFoundTextEntries.Add(FTextLocation(i, FoundPos));
+	//		int32 LastPos = FoundPos + SearchString.Len();
+	//		if (LastPos < Line.Len())
+	//		{
+	//			FoundPos = Line.Find(SearchString, ESearchCase::IgnoreCase, ESearchDir::FromStart, LastPos);
+	//		}
+	//		else
+	//		{
+	//			FoundPos = INDEX_NONE;
+	//		}
+	//	}
+	//}
 
-	if (ActiveFoundTextEntries.Num() > 0 && OldText.CompareTo(InFilterText) != 0)
-	{
-		CurrentFoundTextEntry = 0;
-		//GeneratedCode[TabState].Text->ScrollTo(ActiveFoundTextEntries[CurrentFoundTextEntry]);
-	}
-	else if (ActiveFoundTextEntries.Num() == 0)
-	{
-		CurrentFoundTextEntry = INDEX_NONE;
-	}
+	//if (ActiveFoundTextEntries.Num() > 0 && OldText.CompareTo(InFilterText) != 0)
+	//{
+	//	CurrentFoundTextEntry = 0;
+	//	//GeneratedCode[TabState].Text->ScrollTo(ActiveFoundTextEntries[CurrentFoundTextEntry]);
+	//}
+	//else if (ActiveFoundTextEntries.Num() == 0)
+	//{
+	//	CurrentFoundTextEntry = INDEX_NONE;
+	//}
 
 	SetSearchMofN();
 }
@@ -279,7 +277,6 @@ SHLSLCodeEditor::~SHLSLCodeEditor()
 
 void SHLSLCodeEditor::SetCode(FText InCode)
 {
-	GeneratedCode.Hlsl = InCode;
 	GeneratedCode.Text->SetText(InCode);
 }
 

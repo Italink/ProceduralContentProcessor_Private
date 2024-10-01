@@ -36,11 +36,6 @@ public:
 protected:
 	struct TabInfo
 	{
-		FText UsageName;
-		FText Hlsl;
-		FGuid UsageId;
-
-		TArray<FString> HlslByLines;
 		TSharedPtr<SMultiLineEditableTextBox> Text;
 		TSharedPtr<SScrollBar> HorizontalScrollBar;
 		TSharedPtr<SScrollBar> VerticalScrollBar;

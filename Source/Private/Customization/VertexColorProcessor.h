@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ProceduralContentProcessor.h"
+#include "Engine/StaticMeshActor.h"
 #include "VertexColorProcessor.generated.h"
 
 class SHLSLCodeEditor;
@@ -19,10 +20,18 @@ protected:
 	void OnActorSelectionChanged(const TArray<UObject*>& NewSelection, bool bForceRefresh);
 	FReply OnClickedReset();
 	FReply OnClickedExecute();
+
+	void OnApplyVertexColor(TArray<FVector4f> VertexColors);
 private:
 	FText DefaultCS;
+
 	FDelegateHandle OnActorSelectionChangedHandle;
+
 	TSharedPtr<SHLSLCodeEditor> HLSLEditor;
+
+	UPROPERTY(Config)
+	FString CurrentCode;
+
 	UPROPERTY()
-	TObjectPtr<UStaticMesh> StaticMesh;
+	TObjectPtr<AStaticMeshActor> StaticMeshActor;
 };
