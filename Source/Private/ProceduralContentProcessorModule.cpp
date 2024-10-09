@@ -34,21 +34,37 @@ const FName LevelEditorProceduralContentProcessorBrowser(TEXT("LevelEditorProced
 
 void FProceduralContentProcessorModule::StartupModule()
 {
-	//IAssetTools& AssetTools = FModuleManager::LoadModuleChecked<FAssetToolsModule>("AssetTools").Get();
-	//AssetTools.RegisterAdvancedAssetCategory("ProceduralContentProcessor", LOCTEXT("ProceduralContentProcessor", "Procedural Content Processor"));
-
-	//FPropertyEditorModule& PropertyModule = FModuleManager::GetModuleChecked<FPropertyEditorModule>("PropertyEditor");
-	//PropertyModule.RegisterCustomPropertyTypeLayout(FProceduralObjectMatrix::StaticStruct()->GetFName(), FOnGetPropertyTypeCustomizationInstance::CreateStatic(&FPropertyTypeCustomization_ProceduralObjectMatrix::MakeInstance));
-
-	//ProceduralAssetProcessorAssetActions = MakeShared<FProceduralAssetProcessorAssetActions>();
-	//AssetTools.RegisterAssetTypeActions(ProceduralAssetProcessorAssetActions.ToSharedRef());
-	//ProceduralWorldProcessorAssetActions = MakeShared<FProceduralWorldProcessorAssetActions>();
-	//AssetTools.RegisterAssetTypeActions(ProceduralWorldProcessorAssetActions.ToSharedRef());
-	//ProceduralActorColorationProcessorAssetActions = MakeShared<FProceduralActorColorationProcessorAssetActions>();
-	//AssetTools.RegisterAssetTypeActions(ProceduralActorColorationProcessorAssetActions.ToSharedRef());
-
 	FString PluginShaderDir = FPaths::Combine(IPluginManager::Get().FindPlugin(TEXT("ProceduralContentProcessor"))->GetBaseDir(), TEXT("Shaders"));
 	AddShaderSourceDirectoryMapping(TEXT("/Plugins/ProceduralContentProcessor"), PluginShaderDir);
+
+	FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([this](float Delta) -> bool{
+		FAssetToolsModule* AssetToolsModule = FModuleManager::GetModulePtr<FAssetToolsModule>("AssetTools");
+		if(AssetToolsModule == nullptr)
+			return true;
+
+		IAssetTools& AssetTools = AssetToolsModule->Get();
+		AssetTools.RegisterAdvancedAssetCategory("ProceduralContentProcessor", LOCTEXT("ProceduralContentProcessor", "Procedural Content Processor"));
+
+		FPropertyEditorModule& PropertyModule = FModuleManager::GetModuleChecked<FPropertyEditorModule>("PropertyEditor");
+		PropertyModule.RegisterCustomPropertyTypeLayout(FProceduralObjectMatrix::StaticStruct()->GetFName(), FOnGetPropertyTypeCustomizationInstance::CreateStatic(&FPropertyTypeCustomization_ProceduralObjectMatrix::MakeInstance));
+
+		ProceduralAssetProcessorAssetActions = MakeShared<FProceduralAssetProcessorAssetActions>();
+		AssetTools.RegisterAssetTypeActions(ProceduralAssetProcessorAssetActions.ToSharedRef());
+		ProceduralWorldProcessorAssetActions = MakeShared<FProceduralWorldProcessorAssetActions>();
+		AssetTools.RegisterAssetTypeActions(ProceduralWorldProcessorAssetActions.ToSharedRef());
+		ProceduralActorColorationProcessorAssetActions = MakeShared<FProceduralActorColorationProcessorAssetActions>();
+		AssetTools.RegisterAssetTypeActions(ProceduralActorColorationProcessorAssetActions.ToSharedRef());
+
+		FEditorModeRegistry::Get().RegisterMode<FProceduralContentProcessorEdMode>(
+			FProceduralContentProcessorEdMode::EdID,
+			LOCTEXT("ProceduralContentProcessor", "Procedural Content Processor"),
+			FSlateIcon(),
+			true, 5000000
+		);
+
+		return false;
+	}));
+
 
 	//FLevelEditorModule& LevelEditorModule = FModuleManager::GetModuleChecked<FLevelEditorModule>("LevelEditor");
 	//LevelEditorModule.OnTabManagerChanged().AddLambda([this]() {
@@ -60,14 +76,9 @@ void FProceduralContentProcessorModule::StartupModule()
 	//		.SetTooltipText(LOCTEXT("LevelEditorProceduralContentProcessorBrowserTooltipText", "Open the Procedural Content Processor Outliner."))
 	//		.SetIcon(ProceduralContentProcessorsIcon)
 	//		.SetGroup(WorkspaceMenu::GetMenuStructure().GetLevelEditorCategory());
-	//});
+	//	});
 
-	FEditorModeRegistry::Get().RegisterMode<FProceduralContentProcessorEdMode>(
-		FProceduralContentProcessorEdMode::EdID,
-		LOCTEXT("ProceduralContentProcessor", "Procedural Content Processor"),
-		FSlateIcon(),
-		true, 5000000
-	);
+
 }
 
 void FProceduralContentProcessorModule::ShutdownModule()

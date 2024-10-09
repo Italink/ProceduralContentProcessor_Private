@@ -6,19 +6,22 @@
 
 class SHLSLCodeEditor;
 
-UCLASS(EditInlineNew, CollapseCategories, config = ProceduralContentProcessor, defaultconfig)
+UCLASS(EditInlineNew, CollapseCategories, config = ProceduralContentProcessor, defaultconfig, Category = "Model")
 class PROCEDURALCONTENTPROCESSOR_API UVertexColorProcessor: public UProceduralWorldProcessor {
 	GENERATED_BODY()
 public:
 	UVertexColorProcessor();
 protected:
 	virtual void Activate() override;
+
 	virtual void Deactivate() override;
 
 	virtual TSharedPtr<SWidget> BuildWidget() override;
 
 	void OnActorSelectionChanged(const TArray<UObject*>& NewSelection, bool bForceRefresh);
+
 	FReply OnClickedReset();
+
 	FReply OnClickedExecute();
 
 	void OnApplyVertexColor(TArray<FVector4f> VertexColors);

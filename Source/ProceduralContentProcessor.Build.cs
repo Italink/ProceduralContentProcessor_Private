@@ -63,6 +63,7 @@ public class ProceduralContentProcessor : ModuleRules
                 "ProceduralMeshComponent",
                 "NiagaraEditor",
                 "RenderCore",
+                "LevelStreamingPersistence",
                 "ShaderFormatVectorVM"
 				// ... add private dependencies that you statically link with here ...	
 			}

@@ -148,8 +148,14 @@ void SProceduralContentProcessorEditorOutliner::RefreshProcessorList()
 		return GetSortPriority(A) < GetSortPriority(B);
 	});
 
+	TSharedPtr<FProcessorEditorField_Category> CommonCategoryField = MakeShared<FProcessorEditorField_Category>();
+	CommonCategoryField->CategoryText = FText::FromString("Common");
+	TopLevelProcessorField.Add(CommonCategoryField);
+
 	for (auto Processor : ProcessorList) {
 		FString CategoryChain = Processor->GetMetaData("Namespace");
+		if (CategoryChain.IsEmpty())
+			CategoryChain = Processor->GetMetaData("Category");
 		if(CategoryChain.IsEmpty())
 			CategoryChain = TEXT("Common");
 		TArray<FString> CategoryFieldNames;
@@ -206,8 +212,8 @@ void SProceduralContentProcessorEditorOutliner::SetCurrentProcessor(UClass* InPr
 	}
 	if (InProcessorClass) {
 		CurrentProcessor = NewObject<UProceduralContentProcessor>(GetTransientPackage(), InProcessorClass);
-		ProcessorWidgetContainter->SetContent(CurrentProcessor->BuildWidget().ToSharedRef());
 		CurrentProcessor->Activate();
+		ProcessorWidgetContainter->SetContent(CurrentProcessor->BuildWidget().ToSharedRef());
 		CurrentProcessorText = InProcessorClass->GetDisplayNameText();
 		FString DocumentHyperlink;
 		if (UProceduralContentProcessorBlueprint* Blueprint = Cast<UProceduralContentProcessorBlueprint>(InProcessorClass->ClassGeneratedBy)){
