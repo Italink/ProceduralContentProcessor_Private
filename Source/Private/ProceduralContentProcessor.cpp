@@ -198,6 +198,18 @@ AActor* UProceduralWorldProcessor::MergeISM(TArray<AActor*> InSourceActors, TSub
 			Bounds = MeshComp->Bounds + Bounds;
 			InstancedInfo.Add(MeshComp->K2_GetComponentToWorld());
 		}
+		TArray<UInstancedStaticMeshComponent*> InstMeshComps;
+		Actor->GetComponents(InstMeshComps, true);
+		for (auto InstMeshComp : InstMeshComps) {
+			UStaticMesh* Mesh = InstMeshComp->GetStaticMesh();
+			auto& InstancedInfo = InstancedMap.FindOrAdd(Mesh);
+			FTransform Transform;
+			Bounds = InstMeshComp->Bounds + Bounds;
+			for(int i = 0 ;i< InstMeshComp->GetInstanceCount();i++){
+				InstMeshComp->GetInstanceTransform(i, Transform, true);
+				InstancedInfo.Add(Transform);
+			}
+		}
 	}
 	FTransform Transform;
 	Transform.SetLocation(Bounds.Origin);
