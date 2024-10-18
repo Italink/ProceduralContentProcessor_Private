@@ -67,6 +67,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
 	static void LookAtActor(AActor* InActor);
 
+	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor", meta = (WorldContext = "WorldContextObject"))
+	static AActor* SpawnTransientActor(UObject* WorldContextObject, TSubclassOf<AActor> Class, FTransform Transform);
+
 	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
 	static AActor* ReplaceActor(AActor* InSrc, TSubclassOf<AActor> InDst, bool bNoteSelectionChange = false);
 

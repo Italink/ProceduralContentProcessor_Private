@@ -26,5 +26,11 @@
 			"Type": "Editor",
 			"LoadingPhase": "PostConfigInit"
 		}
+	],
+	"Plugins": [
+		{
+			"Name": "LevelStreamingPersistence",
+			"Enabled": true
+		}
 	]
 }

@@ -30,6 +30,14 @@
 #include "Widgets/Notifications/SNotificationList.h"
 #include "Framework/Notifications/NotificationManager.h"
 #include "StaticMeshEditorSubsystem.h"
+#include "LevelEditor.h"
+#include "ViewModels/NiagaraSystemViewModel.h"
+#include "ViewModels/NiagaraEmitterHandleViewModel.h"
+#include "ViewModels/NiagaraSystemViewModel.h"
+#include "ViewModels/Stack/NiagaraStackViewModel.h"
+#include "ViewModels/Stack/NiagaraStackFunctionInput.h"
+#include "ViewModels/Stack/NiagaraStackItemGroup.h"
+#include "ViewModels/Stack/NiagaraStackRoot.h"
 
 #define LOCTEXT_NAMESPACE "ProceduralContentProcessor"
 
@@ -359,6 +367,54 @@ bool UProceduralContentProcessorLibrary::IsGeneratedByBlueprint(UObject* InObjec
 	return InObject&& InObject->GetClass()&&Cast<UBlueprint>(InObject->GetClass()->ClassGeneratedBy);
 }
 
+void UProceduralContentProcessorLibrary::ShowObjectDetailsView(UObject* InObject)
+{
+	static const FName TabID("ObjectDetails");
+
+	FLevelEditorModule& LevelEditor = FModuleManager::GetModuleChecked<FLevelEditorModule>(TEXT("LevelEditor"));
+	TSharedPtr<FTabManager> LevelEditorTabManager = LevelEditor.GetLevelEditorTabManager();
+	if (LevelEditorTabManager == nullptr) {
+		return;
+	}
+	if (LevelEditorTabManager->FindExistingLiveTab(LevelEditorTabIds::LevelEditorSelectionDetails)) {
+		TSharedPtr<SDockTab> LiveTab = LevelEditorTabManager->FindExistingLiveTab(TabID);
+		if (LiveTab != nullptr) {
+			TSharedRef<IDetailsView> DetailView = StaticCastSharedRef<IDetailsView>(LiveTab->GetContent());
+			DetailView->SetObject(InObject);
+			return;
+		}
+		else {
+			FPropertyEditorModule& EditModule = FModuleManager::Get().GetModuleChecked<FPropertyEditorModule>("PropertyEditor");
+			FDetailsViewArgs DetailsViewArgs;
+			DetailsViewArgs.bUpdatesFromSelection = true;
+			DetailsViewArgs.bLockable = true;
+			DetailsViewArgs.bAllowFavoriteSystem = true;
+			//DetailsViewArgs.NameAreaSettings = FDetailsViewArgs::ObjectsUseNameArea | FDetailsViewArgs::ComponentsAndActorsUseNameArea;
+			DetailsViewArgs.NameAreaSettings = FDetailsViewArgs::ENameAreaSettings::HideNameArea;
+			DetailsViewArgs.NotifyHook = GUnrealEd;
+			DetailsViewArgs.ViewIdentifier = FName("BlueprintDefaults");
+			DetailsViewArgs.bCustomNameAreaLocation = true;
+			DetailsViewArgs.bCustomFilterAreaLocation = true;
+			DetailsViewArgs.DefaultsOnlyVisibility = EEditDefaultsOnlyNodeVisibility::Hide;
+			DetailsViewArgs.bShowSectionSelector = true;
+			//DetailsViewArgs.bShowObjectLabel = false;
+			DetailsViewArgs.bAllowSearch = true;
+			auto DetailView = EditModule.CreateDetailView(DetailsViewArgs);
+			DetailView->SetObject(InObject);
+
+			LevelEditorTabManager->InsertNewDocumentTab(LevelEditorTabIds::LevelEditorSelectionDetails, TabID, FTabManager::FLiveTabSearch(),
+				SNew(SDockTab)
+				.TabRole(ETabRole::DocumentTab)
+				.ContentPadding(FMargin(3.0f))
+				.Label(LOCTEXT("ObjectDetails", "Object Details"))
+				[
+					DetailView
+				]
+			);
+		}
+	}
+}
+
 UObject* UProceduralContentProcessorLibrary::CopyProperties(UObject* OldObject, UObject* NewObject)
 {
 	UEngine::FCopyPropertiesForUnrelatedObjectsParams Params;
@@ -529,6 +585,58 @@ float UProceduralContentProcessorLibrary::ConvertDistanceToScreenSize(float Obje
 		return 2.0f;
 	}
 	return  2.0f * ScreenMultiple * ObjectSphereRadius / FMath::Max(1.0f, Distance);
+}
+
+void ForeachNiagaraEntry(UNiagaraStackEntry* Root, TFunction<void(UNiagaraStackEntry*)> Func)
+{
+	if (!Root) 
+		return;
+	Func(Root);
+	TArray<UNiagaraStackEntry*> Children;
+	Root->GetFilteredChildren(Children);
+	for (auto Child : Children) {
+		ForeachNiagaraEntry(Child, Func);
+	}
+}
+
+FNiagaraSystemInfo UProceduralContentProcessorLibrary::GetNiagaraSystemInformation(UNiagaraSystem* InNaigaraSystem)
+{
+	FNiagaraSystemViewModelOptions SystemViewModelOptions;
+	SystemViewModelOptions.bCanSimulate = false;
+	SystemViewModelOptions.bCanAutoCompile = false;
+	// SystemViewModelOptions.bIsForDataProcessingOnly will affect Win.CMD Operate.
+	SystemViewModelOptions.bIsForDataProcessingOnly = true;
+	SystemViewModelOptions.MessageLogGuid = InNaigaraSystem->GetAssetGuid();
+	TSharedRef<FNiagaraSystemViewModel> SystemViewModel = MakeShared<FNiagaraSystemViewModel>();
+	SystemViewModel->Initialize(*InNaigaraSystem, SystemViewModelOptions);
+	TArray<TSharedRef<FNiagaraEmitterHandleViewModel>> EmitterViewModels = SystemViewModel->GetEmitterHandleViewModels();
+	FNiagaraSystemInfo SystemInfo;
+	for (TSharedRef<FNiagaraEmitterHandleViewModel> EmitterHandleViewModel : EmitterViewModels){
+		FNiagaraEmitterHandle* EmitterHandle = EmitterHandleViewModel->GetEmitterHandle();
+
+		FNiagaraEmitterInfo EmitterInfo;
+		EmitterInfo.Name = EmitterHandle->GetName();
+		EmitterInfo.bEnabled = EmitterHandle->GetIsEnabled();
+		EmitterInfo.Mode = EmitterHandle->GetEmitterMode();
+		EmitterInfo.Data = *EmitterHandle->GetEmitterData();
+		UNiagaraStackViewModel* StackViewModel = EmitterHandleViewModel->GetEmitterStackViewModel();
+		TArray<UNiagaraStackItemGroup*> StackItemGroups;
+		StackViewModel->GetRootEntry()->GetUnfilteredChildrenOfType<UNiagaraStackItemGroup>(StackItemGroups);
+		UNiagaraStackRoot* StackRoot = CastChecked<UNiagaraStackRoot>(StackViewModel->GetRootEntry());
+		ForeachNiagaraEntry(StackRoot,[&EmitterInfo](UNiagaraStackEntry* Entry){
+			if (UNiagaraStackFunctionInput* Input = Cast<UNiagaraStackFunctionInput>(Entry)) {
+				FString Name = Input->GetDisplayName().ToString();
+				FString Value;
+
+				//TODO: value assign
+
+				EmitterInfo.Inputs.Add(Name, Value);
+			}
+		});
+		SystemInfo.Emitters.Emplace(EmitterInfo);
+	}
+
+	return SystemInfo;
 }
 
 TArray<TSharedPtr<FSlowTask>> UProceduralContentProcessorLibrary::SlowTasks;

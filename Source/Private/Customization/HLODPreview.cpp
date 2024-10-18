@@ -426,48 +426,48 @@ FReply SHLODOutliner::OnBlockClicked(FActorDescInfo& Info)
 	UWorldPartitionHLODSourceActorsFromCell* SourceActors = Cast<UWorldPartitionHLODSourceActorsFromCell>(HLODActor->GetSourceActors());
 	if (SourceActors == nullptr)
 		return FReply::Handled();
-	if (Actor->IsTemporarilyHiddenInEditor()) {
-		GEditor->GetSelectedActors()->Modify();
-		GEditor->GetSelectedActors()->BeginBatchSelectOperation();
-		GEditor->SelectNone(false, true, true);
-		GEditor->SelectActor(Actor, true, false, true);
-		FBox Bound = ActorDesc->GetEditorBounds();
-		//GEditor->MoveViewportCamerasToBox(Bound, true);
-		DrawDebugBox(World, Bound.GetCenter(), Bound.GetExtent(), FColor(255, 0, 0), false, 2, 0, 20);
-		GEditor->GetSelectedActors()->EndBatchSelectOperation(/*bNotify*/false);
-		GEditor->NoteSelectionChange();
-		Info.bIsPreview = true;
-		Actor->SetIsTemporarilyHiddenInEditor(false);
-		for (auto SourceActor : SourceActors->GetActors()) {
-			if (FWorldPartitionActorDesc* SourceActorDesc = WorldPartition->GetActorDesc(SourceActor.ActorGuid)) {
-				AActor* Source = SourceActorDesc->GetActor();
-				if (Source) {
-					Source->SetIsTemporarilyHiddenInEditor(true);
-				}
-			}
-		}
-	}
-	else {
-		Info.bIsPreview = false;
-		Actor->SetIsTemporarilyHiddenInEditor(true);
-		GEditor->GetSelectedActors()->Modify();
-		GEditor->GetSelectedActors()->BeginBatchSelectOperation();
-		GEditor->SelectNone(false, true, true);
-		for (auto SourceActor : SourceActors->GetActors()) {
-			if (FWorldPartitionActorDesc* SourceActorDesc = WorldPartition->GetActorDesc(SourceActor.ActorGuid)) {
-				if (!SourceActorDesc->IsLoaded()) {
-					WorldPartition->PinActors({ SourceActorDesc->GetGuid() });
-				}
-				AActor* Source = SourceActorDesc->Load();
-				if (Source) {
-					Source->SetIsTemporarilyHiddenInEditor(false);
-					GEditor->SelectActor(Source, true, false, true);
-				}
-			}
-		}
-		GEditor->GetSelectedActors()->EndBatchSelectOperation(/*bNotify*/false);
-		GEditor->NoteSelectionChange();
-	}
+	//if (Actor->IsTemporarilyHiddenInEditor()) {
+	//	GEditor->GetSelectedActors()->Modify();
+	//	GEditor->GetSelectedActors()->BeginBatchSelectOperation();
+	//	GEditor->SelectNone(false, true, true);
+	//	GEditor->SelectActor(Actor, true, false, true);
+	//	FBox Bound = ActorDesc->GetEditorBounds();
+	//	//GEditor->MoveViewportCamerasToBox(Bound, true);
+	//	DrawDebugBox(World, Bound.GetCenter(), Bound.GetExtent(), FColor(255, 0, 0), false, 2, 0, 20);
+	//	GEditor->GetSelectedActors()->EndBatchSelectOperation(/*bNotify*/false);
+	//	GEditor->NoteSelectionChange();
+	//	Info.bIsPreview = true;
+	//	Actor->SetIsTemporarilyHiddenInEditor(false);
+	//	for (auto SourceActor : SourceActors->GetActors()) {
+	//		if (FWorldPartitionActorDesc* SourceActorDesc = WorldPartition->GetActorDescContainer()->GetActorDesc(SourceActor.ActorGuid)) {
+	//			AActor* Source = SourceActorDesc->GetActor();
+	//			if (Source) {
+	//				Source->SetIsTemporarilyHiddenInEditor(true);
+	//			}
+	//		}
+	//	}
+	//}
+	//else {
+	//	Info.bIsPreview = false;
+	//	Actor->SetIsTemporarilyHiddenInEditor(true);
+	//	GEditor->GetSelectedActors()->Modify();
+	//	GEditor->GetSelectedActors()->BeginBatchSelectOperation();
+	//	GEditor->SelectNone(false, true, true);
+	//	for (auto SourceActor : SourceActors->GetActors()) {
+	//		if (FWorldPartitionActorDesc* SourceActorDesc = WorldPartition->GetActorDescContainer()->GetActorDesc(SourceActor.ActorGuid)) {
+	//			if (!SourceActorDesc->IsLoaded()) {
+	//				WorldPartition->PinActors({ SourceActorDesc->GetGuid() });
+	//			}
+	//			AActor* Source = SourceActorDesc->Load();
+	//			if (Source) {
+	//				Source->SetIsTemporarilyHiddenInEditor(false);
+	//				GEditor->SelectActor(Source, true, false, true);
+	//			}
+	//		}
+	//	}
+	//	GEditor->GetSelectedActors()->EndBatchSelectOperation(/*bNotify*/false);
+	//	GEditor->NoteSelectionChange();
+	//}
 	return FReply::Handled();
 }
 

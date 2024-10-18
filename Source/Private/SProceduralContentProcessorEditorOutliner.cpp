@@ -211,7 +211,8 @@ void SProceduralContentProcessorEditorOutliner::SetCurrentProcessor(UClass* InPr
 		GetMutableDefault<UProceduralContentProcessorSettings>()->TryUpdateDefaultConfigFile();
 	}
 	if (InProcessorClass) {
-		CurrentProcessor = NewObject<UProceduralContentProcessor>(GetTransientPackage(), InProcessorClass);
+		UWorld* EditorWorld = GEditor->GetEditorWorldContext().World();
+		CurrentProcessor = NewObject<UProceduralContentProcessor>(EditorWorld != nullptr ? EditorWorld->GetPackage() : GetTransientPackage(), InProcessorClass, NAME_None, RF_Transient);
 		CurrentProcessor->Activate();
 		ProcessorWidgetContainter->SetContent(CurrentProcessor->BuildWidget().ToSharedRef());
 		CurrentProcessorText = InProcessorClass->GetDisplayNameText();

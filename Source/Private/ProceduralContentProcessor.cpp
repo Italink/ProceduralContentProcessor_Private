@@ -271,6 +271,17 @@ void UProceduralWorldProcessor::LookAtActor(AActor* InActor)
 	GEditor->MoveViewportCamerasToActor(*InActor, true);
 }
 
+AActor* UProceduralWorldProcessor::SpawnTransientActor(UObject* WorldContextObject, TSubclassOf<AActor> Class, FTransform Transform)
+{
+	if(WorldContextObject == nullptr)
+		return nullptr;
+	UWorld* World = WorldContextObject->GetWorld();
+	AActor* Actor = World->SpawnActor(Class, &Transform);
+	if(Actor)
+		Actor->SetFlags(RF_Transient);
+	return Actor;
+}
+
 AActor* UProceduralWorldProcessor::ReplaceActor(AActor* InSrc, TSubclassOf<AActor> InDst, bool bNoteSelectionChange /*= false*/)
 {
 	if (!InSrc || !InDst)

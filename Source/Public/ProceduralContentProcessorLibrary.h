@@ -2,6 +2,8 @@
 
 #include "CoreMinimal.h"
 #include "ProceduralObjectMatrix.h"
+#include "NiagaraSystem.h"
+#include "NiagaraEmitter.h"
 #include "ProceduralContentProcessorLibrary.generated.h"
 
 class ALandscape;
@@ -72,6 +74,35 @@ public:
 	FMeshReductionSettings ReductionSettings; 
 };
 
+USTRUCT(BlueprintType)
+struct FNiagaraEmitterInfo 
+{
+	GENERATED_BODY()
+public:
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	FName Name;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	bool bEnabled = false;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	ENiagaraEmitterMode Mode = ENiagaraEmitterMode::Standard;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	FVersionedNiagaraEmitterData Data;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	TMap<FString, FString> Inputs;
+};
+
+USTRUCT(BlueprintType)
+struct FNiagaraSystemInfo
+{
+	GENERATED_BODY()
+public:
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	TArray<FNiagaraEmitterInfo> Emitters;
+};
 
 UCLASS()
 class PROCEDURALCONTENTPROCESSOR_API UProceduralContentProcessorLibrary : public UBlueprintFunctionLibrary
@@ -115,6 +146,9 @@ public:
 	
 	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
 	static bool IsGeneratedByBlueprint(UObject* InObject);
+
+	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
+	static void ShowObjectDetailsView(UObject* InObject);
 
 	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
 	static UObject* CopyProperties(UObject* OldObject, UObject* NewObject);
@@ -203,5 +237,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
 	static float ConvertDistanceToScreenSize(float ObjectSphereRadius, float Distance);
 
+	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
+	static FNiagaraSystemInfo GetNiagaraSystemInformation(UNiagaraSystem * InNaigaraSystem);
+
 	static TArray<TSharedPtr<FSlowTask>> SlowTasks;
+
 };
