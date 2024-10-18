@@ -83,6 +83,9 @@ public:
 	static bool ActorRemoveDataLayer(AActor* Actor, UDataLayerAsset* DataLayerAsset);
 
 	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
+	static bool ActorContainsDataLayer(AActor* Actor, UDataLayerAsset* DataLayerAsset);
+
+	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
 	static FName ActorGetRuntimeGrid(AActor* Actor);
 
 	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")

@@ -325,6 +325,17 @@ bool UProceduralWorldProcessor::ActorRemoveDataLayer(AActor* Actor, UDataLayerAs
 	return false;
 }
 
+bool UProceduralWorldProcessor::ActorContainsDataLayer(AActor* Actor, UDataLayerAsset* DataLayerAsset)
+{
+	if (Actor && DataLayerAsset) {
+		UDataLayerInstance* Instance = GEditor->GetEditorSubsystem<UDataLayerEditorSubsystem>()->GetDataLayerInstance(DataLayerAsset);
+		if (Instance) {
+			return Actor->ContainsDataLayer(Instance);
+		}
+	}
+	return false;
+}
+
 FName UProceduralWorldProcessor::ActorGetRuntimeGrid(AActor* Actor)
 {
 	if (Actor) {
