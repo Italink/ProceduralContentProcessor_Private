@@ -120,6 +120,13 @@ void UProceduralContentProcessorLibrary::AddTextField(FProceduralObjectMatrix& M
 	Matrix.bIsDirty = true;
 }
 
+bool UProceduralContentProcessorLibrary::IsAsset(const UObject* InObject)
+{
+	if(InObject == nullptr)
+		return false;
+	return InObject->IsAsset();
+}
+
 void UProceduralContentProcessorLibrary::BeginTransaction(FText Text)
 {
 	GEditor->BeginTransaction(Text);
@@ -613,7 +620,6 @@ FNiagaraSystemInfo UProceduralContentProcessorLibrary::GetNiagaraSystemInformati
 	FNiagaraSystemInfo SystemInfo;
 	for (TSharedRef<FNiagaraEmitterHandleViewModel> EmitterHandleViewModel : EmitterViewModels){
 		FNiagaraEmitterHandle* EmitterHandle = EmitterHandleViewModel->GetEmitterHandle();
-
 		FNiagaraEmitterInfo EmitterInfo;
 		EmitterInfo.Name = EmitterHandle->GetName();
 		EmitterInfo.bEnabled = EmitterHandle->GetIsEnabled();
