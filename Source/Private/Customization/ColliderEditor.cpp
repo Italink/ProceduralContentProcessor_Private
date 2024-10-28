@@ -378,7 +378,6 @@ void UColliderEditor::OnActorSelectionChanged(const TArray<UObject*>& NewSelecti
 				UWorld* World = StaticMeshActor->GetWorld();
 				ColliderActor = World->SpawnActor<AStaticMeshActor>();
 				ColliderActor->SetFlags(RF_Transient);
-				ColliderActor->GetStaticMeshComponent()->SetMaterial(0, LoadObject<UMaterialInterface>(nullptr, TEXT("/ProceduralContentProcessor/WorldProcessor/Collider/M_Collider.M_Collider")));
 			}
 			UStaticMesh* StaticMesh = StaticMeshActor->GetStaticMeshComponent()->GetStaticMesh();
 			if (StaticMesh) {
@@ -387,6 +386,10 @@ void UColliderEditor::OnActorSelectionChanged(const TArray<UObject*>& NewSelecti
 				if (StaticMesh->ComplexCollisionMesh) {
 					VertexCount = StaticMesh->ComplexCollisionMesh->GetNumVertices(0);
 					TriangleCount = StaticMesh->ComplexCollisionMesh->GetNumTriangles(0);
+					auto WireframeMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/ProceduralContentProcessor/WorldProcessor/Collider/M_Collider.M_Collider"));
+					for (int i = 0; i < ColliderActor->GetStaticMeshComponent()->GetNumMaterials(); i++) {
+						ColliderActor->GetStaticMeshComponent()->SetMaterial(i, LoadObject<UMaterialInterface>(nullptr, TEXT("/ProceduralContentProcessor/WorldProcessor/Collider/M_Collider.M_Collider")));
+					}
 				}
 			}
 		}
