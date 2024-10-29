@@ -120,7 +120,7 @@ void UProceduralContentProcessorLibrary::AddTextField(FProceduralObjectMatrix& M
 	Matrix.bIsDirty = true;
 }
 
-bool UProceduralContentProcessorLibrary::IsAsset(const UObject* InObject)
+bool UProceduralContentProcessorLibrary::ObjectIsAsset(const UObject* InObject)
 {
 	if(InObject == nullptr)
 		return false;
@@ -592,6 +592,26 @@ float UProceduralContentProcessorLibrary::ConvertDistanceToScreenSize(float Obje
 		return 2.0f;
 	}
 	return  2.0f * ScreenMultiple * ObjectSphereRadius / FMath::Max(1.0f, Distance);
+}
+
+UTexture* UProceduralContentProcessorLibrary::ConstructTexture2D(UTextureRenderTarget2D* TextureRenderTarget2D, UObject* Outer, FString Name /*= NAME_None*/)
+{
+	if(TextureRenderTarget2D == nullptr)
+		return nullptr;
+	Outer = Outer ? Outer : GetTransientPackage();
+	UTexture* NewObj = TextureRenderTarget2D->ConstructTexture2D(Outer, Name, TextureRenderTarget2D->GetMaskedFlags() | RF_Public | RF_Standalone,
+		static_cast<EConstructTextureFlags>(CTF_Default | CTF_SkipPostEdit), /*InAlphaOverride = */nullptr);
+	NewObj->CompressionSettings = TextureCompressionSettings::TC_Default;
+	NewObj->MarkPackageDirty();
+	NewObj->PostEditChange();
+	return NewObj;
+}
+
+void UProceduralContentProcessorLibrary::UpdateTexture2D(UTextureRenderTarget2D* TextureRenderTarget2D, UTexture2D* Texture)
+{
+	if (TextureRenderTarget2D == nullptr || Texture == nullptr)
+		return ;
+	TextureRenderTarget2D->UpdateTexture2D(Texture, TextureRenderTarget2D->GetTextureFormatForConversionToTexture2D());
 }
 
 void ForeachNiagaraEntry(UNiagaraStackEntry* Root, TFunction<void(UNiagaraStackEntry*)> Func)

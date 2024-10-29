@@ -4,6 +4,7 @@
 #include "ProceduralObjectMatrix.h"
 #include "NiagaraSystem.h"
 #include "NiagaraEmitter.h"
+#include "Engine/TextureRenderTarget2D.h"
 #include "ProceduralContentProcessorLibrary.generated.h"
 
 class ALandscape;
@@ -128,7 +129,7 @@ public:
 
 
 	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
-	static bool IsAsset(const UObject* InObject);
+	static bool ObjectIsAsset(const UObject* InObject);
 
 	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
 	static TArray<UClass*> GetDerivedClasses(const UClass* ClassToLookFor, bool bRecursive);
@@ -242,8 +243,13 @@ public:
 	static float ConvertDistanceToScreenSize(float ObjectSphereRadius, float Distance);
 
 	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
+	static UTexture* ConstructTexture2D(UTextureRenderTarget2D* TextureRenderTarget2D, UObject* Outer, FString Name);
+
+	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
+	static void UpdateTexture2D(UTextureRenderTarget2D* TextureRenderTarget2D, UTexture2D* Texture);
+
+	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
 	static FNiagaraSystemInfo GetNiagaraSystemInformation(UNiagaraSystem * InNaigaraSystem);
 
 	static TArray<TSharedPtr<FSlowTask>> SlowTasks;
-
 };
