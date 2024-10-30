@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "ProceduralObjectMatrix.h"
+#include "StaticMeshLODChain.h"
 #include "NiagaraSystem.h"
 #include "NiagaraEmitter.h"
 #include "ProceduralContentProcessorLibrary.generated.h"
@@ -50,31 +51,6 @@ enum class EMsgBoxReturnType: uint8
 };
 
 USTRUCT(BlueprintType)
-struct FStaticMeshLODInfo
-{
-	GENERATED_BODY()
-public:
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
-	bool bUseDistance;
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
-	bool bEnableBuildSetting;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditConditionHides, HideEditConditionToggle, EditCondition = "!bUseDistance"))
-	float ScreenSize;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (HideEditConditionToggle, EditCondition = "bUseDistance"))
-	float Distance;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=BuildSettings, meta = (EditConditionHides, HideEditConditionToggle, EditCondition = "bEnableBuildSetting"))
-	FMeshBuildSettings BuildSettings;
-
-	/** Reduction settings to apply when building render data. */
-	UPROPERTY(EditAnywhere)
-	FMeshReductionSettings ReductionSettings; 
-};
-
-USTRUCT(BlueprintType)
 struct FNiagaraEmitterInfo 
 {
 	GENERATED_BODY()
@@ -85,8 +61,8 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	bool bEnabled = false;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
-	ENiagaraEmitterMode Mode = ENiagaraEmitterMode::Standard;
+	//UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	//ENiagaraEmitterMode Mode = ENiagaraEmitterMode::Standard;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	FVersionedNiagaraEmitterData Data;
@@ -223,10 +199,7 @@ public:
 	static UStaticMeshEditorSubsystem* GetStaticMeshEditorSubsystem();
 
 	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
-	static TArray<FStaticMeshLODInfo> GetStaticMeshLODInfos(UStaticMesh* InStaticMesh, bool bUseDistance = false, bool bEnableBuildSetting = false);
-
-	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
-	static void SetStaticMeshLODInfos(UStaticMesh* InStaticMesh, TArray<FStaticMeshLODInfo> InInfos);
+	static TArray<FStaticMeshChainNode> GetStaticMeshLODChain(UStaticMesh* InStaticMesh, bool bUseDistance = false, bool bEnableBuildSetting = false);
 
 	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
 	static float GetLodScreenSize(UStaticMesh* InStaticMesh, int32 LODIndex);

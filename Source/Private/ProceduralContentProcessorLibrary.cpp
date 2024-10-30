@@ -480,9 +480,9 @@ UStaticMeshEditorSubsystem* UProceduralContentProcessorLibrary::GetStaticMeshEdi
 	return GEditor->GetEditorSubsystem<UStaticMeshEditorSubsystem>();
 }
 
-TArray<FStaticMeshLODInfo> UProceduralContentProcessorLibrary::GetStaticMeshLODInfos(UStaticMesh* InStaticMesh, bool bUseDistance /*= false*/, bool bEnableBuildSetting /*= false*/)
+TArray<FStaticMeshChainNode> UProceduralContentProcessorLibrary::GetStaticMeshLODChain(UStaticMesh* InStaticMesh, bool bUseDistance /*= false*/, bool bEnableBuildSetting /*= false*/)
 {
-	TArray<FStaticMeshLODInfo> Infos;
+	TArray<FStaticMeshChainNode> Infos;
 	if (InStaticMesh == nullptr)
 		return Infos;
 	Infos.SetNum(InStaticMesh->GetNumSourceModels());
@@ -495,63 +495,6 @@ TArray<FStaticMeshLODInfo> UProceduralContentProcessorLibrary::GetStaticMeshLODI
 		Infos[i].Distance = GetLodDistance(InStaticMesh, i);
 	}
 	return Infos;
-}
-
-void UProceduralContentProcessorLibrary::SetStaticMeshLODInfos(UStaticMesh* InStaticMesh, TArray<FStaticMeshLODInfo> InInfos)
-{
-	if (InStaticMesh == nullptr || InStaticMesh->GetNumSourceModels() == 0 || InInfos.IsEmpty())
-		return ;
-	bool bStaticMeshIsEdited = false;
-	UAssetEditorSubsystem* AssetEditorSubsystem = GEditor->GetEditorSubsystem<UAssetEditorSubsystem>();
-	if (AssetEditorSubsystem->FindEditorForAsset(InStaticMesh, false))
-	{
-		AssetEditorSubsystem->CloseAllEditorsForAsset(InStaticMesh);
-		bStaticMeshIsEdited = true;
-	}
-
-	const float FOV = 60.0f;
-	const float FOVRad = FOV * (float)UE_PI / 360.0f;
-	const FMatrix ProjectionMatrix = FPerspectiveMatrix(FOVRad, 1920, 1080, 0.01f);
-
-	const float ScreenMultiple = FMath::Max(0.5f * ProjectionMatrix.M[0][0], 0.5f * ProjectionMatrix.M[1][1]);
-	const float SphereRadius = InStaticMesh->GetBounds().SphereRadius;
-
-	InStaticMesh->Modify();
-	InStaticMesh->SetNumSourceModels(1);
-	InStaticMesh->GetSourceModel(0).ReductionSettings = InInfos[0].ReductionSettings;
-	InStaticMesh->GetSourceModel(0).ScreenSize = InInfos[0].ScreenSize;
-	if (InInfos[0].bUseDistance) {
-		if (InInfos[0].Distance == 0) {
-			InStaticMesh->GetSourceModel(0).ScreenSize = 2.0f ;
-		}
-		else {
-			InStaticMesh->GetSourceModel(0).ScreenSize = 2.0f * ScreenMultiple * SphereRadius / FMath::Max(1.0f, InInfos[0].Distance);
-		}
-	}
-
-	int32 LODIndex = 1;
-	for (; LODIndex < InInfos.Num(); ++LODIndex){
-		FStaticMeshSourceModel& SrcModel = InStaticMesh->AddSourceModel();
-
-		SrcModel.BuildSettings = InInfos[LODIndex].BuildSettings;
-		SrcModel.ReductionSettings = InInfos[LODIndex].ReductionSettings;
-		SrcModel.ScreenSize = InInfos[LODIndex].ScreenSize;
-		if (InInfos[LODIndex].bUseDistance) {
-			if (InInfos[LODIndex].Distance == 0) {
-				SrcModel.ScreenSize = 2.0f;
-			}
-			else {
-				SrcModel.ScreenSize = 2.0f * ScreenMultiple * SphereRadius / FMath::Max(1.0f, InInfos[LODIndex].Distance);
-			}
-		}
-
-		// Stop when reaching maximum of supported LODs
-		if (InStaticMesh->GetNumSourceModels() == MAX_STATIC_MESH_LODS){
-			break;
-		}
-	}
-	InStaticMesh->bAutoComputeLODScreenSize = 0;
-	InStaticMesh->PostEditChange();
 }
 
 float UProceduralContentProcessorLibrary::GetLodScreenSize(UStaticMesh* InStaticMesh, int32 LODIndex)
@@ -617,7 +560,7 @@ FNiagaraSystemInfo UProceduralContentProcessorLibrary::GetNiagaraSystemInformati
 		FNiagaraEmitterInfo EmitterInfo;
 		EmitterInfo.Name = EmitterHandle->GetName();
 		EmitterInfo.bEnabled = EmitterHandle->GetIsEnabled();
-		EmitterInfo.Mode = EmitterHandle->GetEmitterMode();
+		//EmitterInfo.Mode = EmitterHandle->GetEmitterMode();
 		EmitterInfo.Data = *EmitterHandle->GetEmitterData();
 		UNiagaraStackViewModel* StackViewModel = EmitterHandleViewModel->GetEmitterStackViewModel();
 		TArray<UNiagaraStackItemGroup*> StackItemGroups;
