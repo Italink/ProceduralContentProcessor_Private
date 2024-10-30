@@ -102,6 +102,10 @@ public:
 
 	// Object Interface:
 
+
+	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
+	static bool IsAsset(const UObject* InObject);
+
 	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
 	static TArray<UClass*> GetDerivedClasses(const UClass* ClassToLookFor, bool bRecursive);
 
