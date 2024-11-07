@@ -66,7 +66,8 @@ public class ProceduralContentProcessor : ModuleRules
                 "LevelStreamingPersistence",
                 "ShaderFormatVectorVM",
                 "Niagara",
-                "NiagaraEditor"
+                "NiagaraEditor",
+                "MaterialEditor"
 				// ... add private dependencies that you statically link with here ...	
 			}
 			);

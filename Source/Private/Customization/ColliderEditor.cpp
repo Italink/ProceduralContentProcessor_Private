@@ -20,6 +20,9 @@
 #include "LevelEditor.h"
 #include "Selection.h"
 #include "Kismet/GameplayStatics.h"
+#include "Materials/MaterialInstanceConstant.h"
+#include "EditorSupportDelegates.h"
+#include "MaterialEditingLibrary.h"
 
 AStaticMeshActor* UCollisionMeshGenerateMethod_Proxy::Generate(TArray<AActor*> InActors)
 {
@@ -64,6 +67,10 @@ AStaticMeshActor* UCollisionMeshGenerateMethod_Proxy::Generate(TArray<AActor*> I
 		for (auto Comp : Actor->GetComponents()) {
 			if (auto StaticMeshComp = Cast<UStaticMeshComponent>(Comp)) {
 				SourceCompList.AddUnique(StaticMeshComp);
+				if (bRemoveSourceMeshCollision) {
+					UStaticMeshEditorSubsystem* StaticMeshEditorSubsystem = GEditor->GetEditorSubsystem<UStaticMeshEditorSubsystem>();
+					StaticMeshEditorSubsystem->RemoveCollisionsWithNotification(StaticMeshComp->GetStaticMesh(), true);
+				}
 			}
 		}
 	}
@@ -261,6 +268,13 @@ void UColliderEditor::Activate()
 	TArray<UObject*> Objects;
 	GEditor->GetSelectedActors()->GetSelectedObjects(Objects);
 	OnActorSelectionChanged(Objects, true);
+	if (!DebugMaterial.IsValid()) {
+		DebugMaterial = LoadObject<UMaterialInstanceConstant>(nullptr, TEXT("/ProceduralContentProcessor/WorldProcessor/Collider/MI_CollisionMesh.MI_CollisionMesh"));
+	}
+	if(auto DebugMaterialObject = Cast<UMaterialInstanceConstant>(DebugMaterial.TryLoad())){
+		DebugMaterialObject->SetScalarParameterValueEditorOnly(FName("Opacity"), 0.5);;
+		UMaterialEditingLibrary::UpdateMaterialInstance(DebugMaterialObject);
+	}
 }
 
 void UColliderEditor::Deactivate()
@@ -269,6 +283,10 @@ void UColliderEditor::Deactivate()
 		FLevelEditorModule& LevelEditor = FModuleManager::GetModuleChecked<FLevelEditorModule>("LevelEditor");
 		LevelEditor.OnActorSelectionChanged().Remove(OnActorSelectionChangedHandle);
 		OnActorSelectionChangedHandle.Reset();
+	}
+	if (auto DebugMaterialObject = Cast<UMaterialInstanceConstant>(DebugMaterial.TryLoad())){
+		DebugMaterialObject->SetScalarParameterValueEditorOnly(FName("Opacity"), 0);
+		UMaterialEditingLibrary::UpdateMaterialInstance(DebugMaterialObject);
 	}
 }
 
@@ -308,10 +326,10 @@ void UColliderEditor::Generate()
 	}
 	UStaticMesh* ColliderMesh = Collider->GetStaticMeshComponent()->GetStaticMesh();
 	if (ColliderMesh) {
-		//auto WireframeMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/ProceduralContentProcessor/WorldProcessor/Collider/M_Collider.M_Collider"));
-		auto WireframeMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/CodeFlee/Materials/MI_CollisionMesh.MI_CollisionMesh"));
-		for (int i = 0; i < ColliderMesh->GetStaticMaterials().Num() ; i++) {
-			ColliderMesh->SetMaterial(i, WireframeMat);
+		if (auto DebugMaterialObject = Cast<UMaterialInstanceConstant>(DebugMaterial.TryLoad())) {
+			for (int i = 0; i < ColliderMesh->GetStaticMaterials().Num(); i++) {
+				ColliderMesh->SetMaterial(i, DebugMaterialObject);
+			}
 		}
 		ColliderMesh->bCustomizedCollision = true;
 		ColliderMesh->ComplexCollisionMesh = ColliderMesh;

@@ -51,30 +51,6 @@ enum class EMsgBoxReturnType: uint8
 	Continue,
 };
 
-struct FStaticMeshLODInfo
-{
-	GENERATED_BODY()
-public:
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
-	bool bUseDistance = true;
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
-	bool bEnableBuildSetting = false;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditConditionHides, HideEditConditionToggle, EditCondition = "!bUseDistance"))
-	float ScreenSize = 1.0f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (HideEditConditionToggle, EditCondition = "bUseDistance"))
-	float Distance = 0;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=BuildSettings, meta = (EditConditionHides, HideEditConditionToggle, EditCondition = "bEnableBuildSetting"))
-	FMeshBuildSettings BuildSettings;
-
-	/** Reduction settings to apply when building render data. */
-	UPROPERTY(EditAnywhere)
-	FMeshReductionSettings ReductionSettings; 
-};
-
 USTRUCT(BlueprintType)
 struct FNiagaraEmitterInfo 
 {

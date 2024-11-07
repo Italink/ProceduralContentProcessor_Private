@@ -4,13 +4,16 @@
 #include "ColliderEditor.generated.h"
 
 
-UCLASS(Abstract, EditInlineNew, CollapseCategories, Blueprintable, BlueprintType)
+UCLASS(Abstract, EditInlineNew, CollapseCategories, Blueprintable, BlueprintType, config = ProceduralContentProcessor, defaultconfig )
 class PROCEDURALCONTENTPROCESSOR_API UCollisionMeshGenerateMethodBase : public UObject
 {
 	GENERATED_BODY()
 public:
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere, Config)
 	bool bMergeMaterials = true;
+
+	UPROPERTY(EditAnywhere, Config)
+	bool bRemoveSourceMeshCollision = true;
 
 	virtual AStaticMeshActor* Generate(TArray<AActor*> InActors) { return nullptr; };
 };
@@ -22,7 +25,7 @@ class PROCEDURALCONTENTPROCESSOR_API UCollisionMeshGenerateMethod_Approximate : 
 public:
 	virtual AStaticMeshActor* Generate(TArray<AActor*> InActors) override;
 
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere, Config)
 	FMeshApproximationSettings ApproximationSettings;
 };
 
@@ -33,21 +36,21 @@ class PROCEDURALCONTENTPROCESSOR_API UCollisionMeshGenerateMethod_Proxy : public
 public:
 	virtual AStaticMeshActor* Generate(TArray<AActor*> InActors) override;
 
-	UPROPERTY( EditAnywhere, meta = (ClampMin = "1", ClampMax = "1200", UIMin = "1", UIMax = "1200"))
+	UPROPERTY( EditAnywhere, Config, meta = (ClampMin = "1", ClampMax = "1200", UIMin = "1", UIMax = "1200"))
 	int32 ScreenSize = 50;
 
 	/** Override when converting multiple meshes for proxy LOD merging. Warning, large geometry with small sampling has very high memory costs*/
-	UPROPERTY(EditAnywhere, meta = (EditCondition = "bOverrideVoxelSize", ClampMin = "0.1", DisplayName = "Override Spatial Sampling Distance"))
+	UPROPERTY(EditAnywhere, Config, meta = (EditCondition = "bOverrideVoxelSize", ClampMin = "0.1", DisplayName = "Override Spatial Sampling Distance"))
 	float VoxelSize = 3.f;
 
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere, Config)
 	float MergeDistance = 0;
 
-	UPROPERTY(EditAnywhere, meta = (DisplayAfter = "ScreenSize"))
+	UPROPERTY(EditAnywhere, Config, meta = (DisplayAfter = "ScreenSize"))
 	bool bCalculateCorrectLODModel = 0;
 
 	/** If true, Spatial Sampling Distance will not be automatically computed based on geometry and you must set it directly */
-	UPROPERTY(EditAnywhere, AdvancedDisplay, meta = (InlineEditConditionToggle))
+	UPROPERTY(EditAnywhere, Config, AdvancedDisplay, meta = (InlineEditConditionToggle))
 	bool bOverrideVoxelSize = false;
 };
 
@@ -75,6 +78,9 @@ private:
 
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<AStaticMeshActor> ColliderActor;
+
+	UPROPERTY(EditAnywhere, Config)
+	FSoftObjectPath DebugMaterial;
 
 	UPROPERTY(VisibleAnywhere)
 	int VertexCount;
