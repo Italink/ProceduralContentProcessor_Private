@@ -56,16 +56,16 @@ struct FStaticMeshLODInfo
 	GENERATED_BODY()
 public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
-	bool bUseDistance;
+	bool bUseDistance = true;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
-	bool bEnableBuildSetting;
+	bool bEnableBuildSetting = false;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditConditionHides, HideEditConditionToggle, EditCondition = "!bUseDistance"))
-	float ScreenSize;
+	float ScreenSize = 1.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (HideEditConditionToggle, EditCondition = "bUseDistance"))
-	float Distance;
+	float Distance = 0;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=BuildSettings, meta = (EditConditionHides, HideEditConditionToggle, EditCondition = "bEnableBuildSetting"))
 	FMeshBuildSettings BuildSettings;
@@ -126,7 +126,6 @@ public:
 
 
 	// Object Interface:
-
 
 	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
 	static bool ObjectIsAsset(const UObject* InObject);
@@ -243,7 +242,7 @@ public:
 	static float ConvertDistanceToScreenSize(float ObjectSphereRadius, float Distance);
 
 	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
-	static UTexture* ConstructTexture2D(UTextureRenderTarget2D* TextureRenderTarget2D, UObject* Outer, FString Name);
+	static UTexture* ConstructTexture2D(UTextureRenderTarget2D* TextureRenderTarget2D, UObject* Outer, FString Name, TextureCompressionSettings CompressionSettings = TC_Default);
 
 	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
 	static void UpdateTexture2D(UTextureRenderTarget2D* TextureRenderTarget2D, UTexture2D* Texture);

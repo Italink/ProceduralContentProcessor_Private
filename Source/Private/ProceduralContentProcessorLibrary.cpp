@@ -594,14 +594,14 @@ float UProceduralContentProcessorLibrary::ConvertDistanceToScreenSize(float Obje
 	return  2.0f * ScreenMultiple * ObjectSphereRadius / FMath::Max(1.0f, Distance);
 }
 
-UTexture* UProceduralContentProcessorLibrary::ConstructTexture2D(UTextureRenderTarget2D* TextureRenderTarget2D, UObject* Outer, FString Name /*= NAME_None*/)
+UTexture* UProceduralContentProcessorLibrary::ConstructTexture2D(UTextureRenderTarget2D* TextureRenderTarget2D, UObject* Outer, FString Name /*= NAME_None*/, TextureCompressionSettings CompressionSettings)
 {
 	if(TextureRenderTarget2D == nullptr)
 		return nullptr;
 	Outer = Outer ? Outer : GetTransientPackage();
 	UTexture* NewObj = TextureRenderTarget2D->ConstructTexture2D(Outer, Name, TextureRenderTarget2D->GetMaskedFlags() | RF_Public | RF_Standalone,
 		static_cast<EConstructTextureFlags>(CTF_Default | CTF_SkipPostEdit), /*InAlphaOverride = */nullptr);
-	NewObj->CompressionSettings = TextureCompressionSettings::TC_Default;
+	NewObj->CompressionSettings = CompressionSettings;
 	NewObj->MarkPackageDirty();
 	NewObj->PostEditChange();
 	return NewObj;

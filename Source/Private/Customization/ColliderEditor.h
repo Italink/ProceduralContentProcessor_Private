@@ -9,7 +9,10 @@ class PROCEDURALCONTENTPROCESSOR_API UCollisionMeshGenerateMethodBase : public U
 {
 	GENERATED_BODY()
 public:
-	virtual UStaticMesh* Generate(UStaticMesh* InMesh) { return nullptr; };
+	UPROPERTY(EditAnywhere)
+	bool bMergeMaterials = true;
+
+	virtual AStaticMeshActor* Generate(TArray<AActor*> InActors) { return nullptr; };
 };
 
 UCLASS(meta = (DisplayName = "Approximate"), CollapseCategories)
@@ -17,7 +20,7 @@ class PROCEDURALCONTENTPROCESSOR_API UCollisionMeshGenerateMethod_Approximate : 
 {
 	GENERATED_BODY()
 public:
-	virtual UStaticMesh* Generate(UStaticMesh* InMesh) override;
+	virtual AStaticMeshActor* Generate(TArray<AActor*> InActors) override;
 
 	UPROPERTY(EditAnywhere)
 	FMeshApproximationSettings ApproximationSettings;
@@ -28,7 +31,7 @@ class PROCEDURALCONTENTPROCESSOR_API UCollisionMeshGenerateMethod_Proxy : public
 {
 	GENERATED_BODY()
 public:
-	virtual UStaticMesh* Generate(UStaticMesh* InMesh) override;
+	virtual AStaticMeshActor* Generate(TArray<AActor*> InActors) override;
 
 	UPROPERTY( EditAnywhere, meta = (ClampMin = "1", ClampMax = "1200", UIMin = "1", UIMax = "1200"))
 	int32 ScreenSize = 50;
@@ -48,7 +51,6 @@ public:
 	bool bOverrideVoxelSize = false;
 };
 
-
 UCLASS(EditInlineNew, CollapseCategories, config = ProceduralContentProcessor, defaultconfig, Category = "WorldPartition", meta = (DisplayName = "Collider Editor"))
 class UColliderEditor : public UProceduralWorldProcessor {
 	GENERATED_BODY()
@@ -59,9 +61,14 @@ protected:
 
 	UFUNCTION(CallInEditor)
 	void Generate();
+
+	void RefreshColliderFinder();
 private:
 	UPROPERTY(EditAnywhere)
-	TObjectPtr<AStaticMeshActor> StaticMeshActor;
+	TArray<TObjectPtr<AActor>> SourceActors;
+
+	UPROPERTY(EditAnywhere)
+	TArray<TObjectPtr<UStaticMesh>> SourceMeshes;
 
 	UPROPERTY(EditAnywhere, Instanced, NoClear, meta = (ShowOnlyInnerProperties))
 	UCollisionMeshGenerateMethodBase* GenerateMethod = NewObject<UCollisionMeshGenerateMethod_Proxy>();
@@ -77,6 +84,6 @@ private:
 
 	FDelegateHandle OnActorSelectionChangedHandle;
 
-
+	TMap<FGuid, TObjectPtr<AActor>> ColliderFinder;
 };
 
