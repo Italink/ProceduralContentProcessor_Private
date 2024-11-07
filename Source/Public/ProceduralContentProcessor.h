@@ -2,6 +2,7 @@
 #include "UObject/Object.h"
 #include "GameFramework/Actor.h"
 #include "Blueprint/UserWidget.h"
+#include "StaticMeshLODChain.h"
 #include "ProceduralContentProcessor.generated.h"
 
 UCLASS(Abstract, Blueprintable, EditInlineNew, CollapseCategories, config = ProceduralContentProcessor, defaultconfig)
@@ -98,7 +99,10 @@ public:
 	static bool HasImposter(AStaticMeshActor* InStaticMeshActor);
 
 	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
-	static void AppendImposterToLODChain(AStaticMeshActor* InStaticMeshActor, AActor* BP_Generate_ImposterSprites, float ScreenSize);
+	static void SetStaticMeshLODChain(AStaticMeshActor* InStaticMeshActor, AActor* BP_Generate_ImposterSprites, TArray<FStaticMeshChainNode> InChain);
+
+	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
+	static void ApplyImposterToLODChain(AStaticMeshActor* InStaticMeshActor, AActor* BP_Generate_ImposterSprites, int TargetLODIndex, float ScreenSize, FMeshImposterSettings ImposterSettings);
 protected:
 	virtual UWorld* GetWorld() const override;
 };

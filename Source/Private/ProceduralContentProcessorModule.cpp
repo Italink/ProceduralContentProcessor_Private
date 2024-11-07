@@ -76,7 +76,7 @@ void FProceduralContentProcessorModule::StartupModule()
 	//		.SetTooltipText(LOCTEXT("LevelEditorProceduralContentProcessorBrowserTooltipText", "Open the Procedural Content Processor Outliner."))
 	//		.SetIcon(ProceduralContentProcessorsIcon)
 	//		.SetGroup(WorkspaceMenu::GetMenuStructure().GetLevelEditorCategory());
-	//	});
+	//});
 
 
 }

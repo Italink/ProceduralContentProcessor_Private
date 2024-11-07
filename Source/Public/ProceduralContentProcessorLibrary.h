@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "ProceduralObjectMatrix.h"
+#include "StaticMeshLODChain.h"
 #include "NiagaraSystem.h"
 #include "NiagaraEmitter.h"
 #include "Engine/TextureRenderTarget2D.h"
@@ -50,7 +51,6 @@ enum class EMsgBoxReturnType: uint8
 	Continue,
 };
 
-USTRUCT(BlueprintType)
 struct FStaticMeshLODInfo
 {
 	GENERATED_BODY()
@@ -127,7 +127,6 @@ public:
 
 	// Object Interface:
 
-	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
 	static bool ObjectIsAsset(const UObject* InObject);
 
 	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
@@ -227,10 +226,7 @@ public:
 	static UStaticMeshEditorSubsystem* GetStaticMeshEditorSubsystem();
 
 	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
-	static TArray<FStaticMeshLODInfo> GetStaticMeshLODInfos(UStaticMesh* InStaticMesh, bool bUseDistance = false, bool bEnableBuildSetting = false);
-
-	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
-	static void SetStaticMeshLODInfos(UStaticMesh* InStaticMesh, TArray<FStaticMeshLODInfo> InInfos);
+	static TArray<FStaticMeshChainNode> GetStaticMeshLODChain(UStaticMesh* InStaticMesh, bool bUseDistance = false, bool bEnableBuildSetting = false);
 
 	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
 	static float GetLodScreenSize(UStaticMesh* InStaticMesh, int32 LODIndex);

@@ -372,21 +372,95 @@ bool UProceduralWorldProcessor::HasImposter(AStaticMeshActor* InStaticMeshActor)
 	return MIC != nullptr;
 }
 
-void UProceduralWorldProcessor::AppendImposterToLODChain(AStaticMeshActor* InStaticMeshActor, AActor* BP_Generate_ImposterSprites, float ScreenSize)
+void UProceduralWorldProcessor::SetStaticMeshLODChain(AStaticMeshActor* InStaticMeshActor, AActor* BP_Generate_ImposterSprites, TArray<FStaticMeshChainNode> InChain)
 {
-	if(!InStaticMeshActor || !BP_Generate_ImposterSprites)
+	if (InStaticMeshActor == nullptr)
+		return;
+	UStaticMesh* StaticMesh = InStaticMeshActor->GetStaticMeshComponent()->GetStaticMesh();
+	if (StaticMesh == nullptr || StaticMesh->GetNumSourceModels() == 0 || InChain.IsEmpty())
+		return;
+	bool bStaticMeshIsEdited = false;
+	UAssetEditorSubsystem* AssetEditorSubsystem = GEditor->GetEditorSubsystem<UAssetEditorSubsystem>();
+	if (AssetEditorSubsystem->FindEditorForAsset(StaticMesh, false))
+	{
+		AssetEditorSubsystem->CloseAllEditorsForAsset(StaticMesh);
+		bStaticMeshIsEdited = true;
+	}
+
+	const float FOV = 60.0f;
+	const float FOVRad = FOV * (float)UE_PI / 360.0f;
+	const FMatrix ProjectionMatrix = FPerspectiveMatrix(FOVRad, 1920, 1080, 0.01f);
+
+	const float ScreenMultiple = FMath::Max(0.5f * ProjectionMatrix.M[0][0], 0.5f * ProjectionMatrix.M[1][1]);
+	const float SphereRadius = StaticMesh->GetBounds().SphereRadius;
+
+	StaticMesh->Modify();
+	StaticMesh->SetNumSourceModels(1);
+	StaticMesh->GetSourceModel(0).ReductionSettings = InChain[0].ReductionSettings;
+	StaticMesh->GetSourceModel(0).ScreenSize = InChain[0].ScreenSize;
+	if (InChain[0].bUseDistance) {
+		if (InChain[0].Distance == 0) {
+			StaticMesh->GetSourceModel(0).ScreenSize = 2.0f;
+		}
+		else {
+			StaticMesh->GetSourceModel(0).ScreenSize = 2.0f * ScreenMultiple * SphereRadius / FMath::Max(1.0f, InChain[0].Distance);
+		}
+	}
+
+	int32 LODIndex = 1;
+	for (; LODIndex < InChain.Num(); ++LODIndex) {
+		FStaticMeshSourceModel& SrcModel = StaticMesh->AddSourceModel();
+		const FStaticMeshChainNode& ChainNode = InChain[LODIndex];
+		float ScreenSize = InChain[LODIndex].ScreenSize;
+		if (InChain[LODIndex].bUseDistance) {
+			if (InChain[LODIndex].Distance == 0) {
+				ScreenSize = 2.0f;
+			}
+			else {
+				ScreenSize = 2.0f * ScreenMultiple * SphereRadius / FMath::Max(1.0f, InChain[LODIndex].Distance);
+			}
+		}
+		if (ChainNode.Type == EStaticMeshLODGenerateType::Reduce) {
+			SrcModel.BuildSettings = InChain[LODIndex].BuildSettings;
+			SrcModel.ReductionSettings = InChain[LODIndex].ReductionSettings;
+			SrcModel.ScreenSize = ScreenSize;
+		}
+		else {
+			ApplyImposterToLODChain(InStaticMeshActor, BP_Generate_ImposterSprites, LODIndex, ScreenSize, ChainNode.ImposterSettings);
+		}
+
+		// Stop when reaching maximum of supported LODs
+		if (StaticMesh->GetNumSourceModels() == MAX_STATIC_MESH_LODS) {
+			break;
+		}
+	}
+	StaticMesh->bAutoComputeLODScreenSize = 0;
+	StaticMesh->ImportVersion = EImportStaticMeshVersion::LastVersion;
+	StaticMesh->Build();
+
+	StaticMesh->PostEditChange();
+	StaticMesh->MarkPackageDirty();
+	StaticMesh->WaitForPendingInitOrStreaming(true, true);
+
+	FStaticMeshCompilingManager::Get().FinishAllCompilation();
+
+	if (bStaticMeshIsEdited)
+	{
+		AssetEditorSubsystem->OpenEditorForAsset(StaticMesh);
+	}
+}
+
+void UProceduralWorldProcessor::ApplyImposterToLODChain(AStaticMeshActor* InStaticMeshActor, AActor* BP_Generate_ImposterSprites, int TargetLODIndex, float ScreenSize, FMeshImposterSettings ImposterSettings)
+{
+	if (!InStaticMeshActor || !BP_Generate_ImposterSprites)
 		return;
 	UStaticMesh* StaticMesh = InStaticMeshActor->GetStaticMeshComponent()->GetStaticMesh();
 	UClass* BPClass = BP_Generate_ImposterSprites->GetClass();
-	if (UFunction* ClearRTFunc = BPClass->FindFunctionByName("1) Clear RTs")) {
-		BP_Generate_ImposterSprites->ProcessEvent(ClearRTFunc, nullptr);
+	if (FIntProperty* ResolutionProp = FindFProperty<FIntProperty>(BPClass, "Resolution")) {
+		ResolutionProp->SetValue_InContainer(BP_Generate_ImposterSprites, ImposterSettings.Resolution);
 	}
-	if (UFunction* RenderFramesFunc = BPClass->FindFunctionByName("2) RenderFrames")) {
-		if (FObjectProperty* ActorProp = FindFProperty<FObjectProperty>(BPClass, "Static Mesh Actor")) {
-			ActorProp->SetObjectPropertyValue_InContainer(BP_Generate_ImposterSprites, InStaticMeshActor);
-			BP_Generate_ImposterSprites->UserConstructionScript();
-		}
-		BP_Generate_ImposterSprites->ProcessEvent(RenderFramesFunc, nullptr);
+	if (FIntProperty* FrameXYProp = FindFProperty<FIntProperty>(BPClass, "Frame XY")) {
+		FrameXYProp->SetValue_InContainer(BP_Generate_ImposterSprites, ImposterSettings.Resolution);
 	}
 	int32 ImpostorType = -1;
 	UMaterialInterface* MaterialInterface = nullptr;
@@ -404,7 +478,24 @@ void UProceduralWorldProcessor::AppendImposterToLODChain(AStaticMeshActor* InSta
 		MaterialProp = FindFProperty<FObjectProperty>(BPClass, "Billboard Material");
 	}
 	if (MaterialProp) {
-		MaterialInterface = Cast<UMaterialInterface>(MaterialProp->GetObjectPropertyValue_InContainer(BP_Generate_ImposterSprites));
+		if (ImposterSettings.ParentMaterial) {
+			MaterialProp->SetObjectPropertyValue_InContainer(BP_Generate_ImposterSprites, ImposterSettings.ParentMaterial);
+			MaterialInterface = ImposterSettings.ParentMaterial;
+		}
+		else {
+			MaterialInterface = Cast<UMaterialInterface>(MaterialProp->GetObjectPropertyValue_InContainer(BP_Generate_ImposterSprites));
+		}
+	}
+
+	if (UFunction* ClearRTFunc = BPClass->FindFunctionByName("1) Clear RTs")) {
+		BP_Generate_ImposterSprites->ProcessEvent(ClearRTFunc, nullptr);
+	}
+	if (UFunction* RenderFramesFunc = BPClass->FindFunctionByName("2) RenderFrames")) {
+		if (FObjectProperty* ActorProp = FindFProperty<FObjectProperty>(BPClass, "Static Mesh Actor")) {
+			ActorProp->SetObjectPropertyValue_InContainer(BP_Generate_ImposterSprites, InStaticMeshActor);
+			BP_Generate_ImposterSprites->UserConstructionScript();
+		}
+		BP_Generate_ImposterSprites->ProcessEvent(RenderFramesFunc, nullptr);
 	}
 	bool bNeedNewMesh = false;
 	int32 MaterialIndex = 0;
@@ -413,7 +504,7 @@ void UProceduralWorldProcessor::AppendImposterToLODChain(AStaticMeshActor* InSta
 	if (MIC != nullptr) {
 		if (StaticMesh->GetStaticMaterials().Contains(MIC)) {
 			const auto& LastTriangles = StaticMesh->GetNumTriangles(StaticMesh->GetNumSourceModels() - 1);
-			if(LastTriangles != 8){
+			if (LastTriangles != 8) {
 				MaterialIndex = StaticMesh->GetStaticMaterials().IndexOfByKey(MIC);
 				bNeedNewMesh = true;
 			}
@@ -432,17 +523,17 @@ void UProceduralWorldProcessor::AppendImposterToLODChain(AStaticMeshActor* InSta
 	}
 	FProperty* TargetMapsProp = FindFProperty<FProperty>(BPClass, "TargetMaps");
 	TMap<uint32, UTextureRenderTarget*> TargetMaps;
-	TargetMapsProp->GetValue_InContainer(BP_Generate_ImposterSprites,&TargetMaps);
+	TargetMapsProp->GetValue_InContainer(BP_Generate_ImposterSprites, &TargetMaps);
 	const uint32 BaseColorIndex = 0;
 	const uint32 NormalIndex = 6;
 	UTextureRenderTarget2D* TextureRenderTarget2D = Cast<UTextureRenderTarget2D>(TargetMaps[BaseColorIndex]);
 	UTexture* NewObj = TextureRenderTarget2D->ConstructTexture2D(MIC, "BaseColor", TextureRenderTarget2D->GetMaskedFlags() | RF_Public | RF_Standalone,
-		static_cast<EConstructTextureFlags>(CTF_Default  | CTF_SkipPostEdit), /*InAlphaOverride = */nullptr);
+		static_cast<EConstructTextureFlags>(CTF_Default | CTF_SkipPostEdit), /*InAlphaOverride = */nullptr);
 	NewObj->CompressionSettings = TextureCompressionSettings::TC_Default;
 	NewObj->MarkPackageDirty();
 	NewObj->PostEditChange();
 	MIC->SetTextureParameterValueEditorOnly(FName("BaseColor"), NewObj);
-	
+
 	TextureRenderTarget2D = Cast<UTextureRenderTarget2D>(TargetMaps[NormalIndex]);
 	NewObj = TextureRenderTarget2D->ConstructTexture2D(MIC, "Normal", TextureRenderTarget2D->GetMaskedFlags() | RF_Public | RF_Standalone,
 		static_cast<EConstructTextureFlags>(CTF_Default | CTF_AllowMips | CTF_SkipPostEdit), /*InAlphaOverride = */nullptr);
@@ -462,14 +553,20 @@ void UProceduralWorldProcessor::AppendImposterToLODChain(AStaticMeshActor* InSta
 	}
 	if (FProperty* Prop = FindFProperty<FProperty>(BPClass, "Offset Vector")) {
 		FVector OffsetVector;
-		Prop->GetValue_InContainer(BP_Generate_ImposterSprites,&OffsetVector);
+		Prop->GetValue_InContainer(BP_Generate_ImposterSprites, &OffsetVector);
 		MIC->SetVectorParameterValueEditorOnly(FName("Pivot Offset"), FLinearColor(OffsetVector));
 	}
 
 	if (bNeedNewMesh) {
 		const int32 BaseLOD = 0;
-		int32 TargetLODIndex = StaticMesh->GetNumSourceModels();
-		FStaticMeshSourceModel* SourceModel = &StaticMesh->AddSourceModel();
+		FStaticMeshSourceModel* SourceModel = nullptr;
+		if (TargetLODIndex <= StaticMesh->GetNumSourceModels()) {
+			SourceModel = &StaticMesh->GetSourceModel(TargetLODIndex);
+		}
+		else {
+			int32 TargetLODIndex = StaticMesh->GetNumSourceModels();
+			SourceModel = &StaticMesh->AddSourceModel();
+		}
 		FMeshDescription& NewMeshDescription = *StaticMesh->CreateMeshDescription(TargetLODIndex);
 		FStaticMeshAttributes(NewMeshDescription).Register();
 
@@ -490,15 +587,6 @@ void UProceduralWorldProcessor::AppendImposterToLODChain(AStaticMeshActor* InSta
 		Info.MaterialIndex = MaterialIndex;
 		StaticMesh->GetSectionInfoMap().Set(TargetLODIndex, 0, Info);
 	}
-
-	StaticMesh->ImportVersion = EImportStaticMeshVersion::LastVersion;
-	StaticMesh->Build();
-
-	StaticMesh->PostEditChange();
-	StaticMesh->MarkPackageDirty();
-	StaticMesh->WaitForPendingInitOrStreaming(true, true);
-
-	FStaticMeshCompilingManager::Get().FinishAllCompilation();
 }
 
 UWorld* UProceduralWorldProcessor::GetWorld() const
