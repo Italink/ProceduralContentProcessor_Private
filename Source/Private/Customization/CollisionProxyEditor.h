@@ -54,7 +54,7 @@ public:
 	bool bOverrideVoxelSize = false;
 };
 
-UCLASS(EditInlineNew, CollapseCategories, config = ProceduralContentProcessor, defaultconfig, Category = "WorldPartition", meta = (DisplayName = "CollisionProxy Editor"))
+UCLASS(EditInlineNew, CollapseCategories, config = ProceduralContentProcessor, defaultconfig, Category = "WorldPartition", meta = (DisplayName = "Collision Proxy Editor"))
 class UCollisionProxyEditor : public UProceduralWorldProcessor {
 	GENERATED_BODY()
 protected:

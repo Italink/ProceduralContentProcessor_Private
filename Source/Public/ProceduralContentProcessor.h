@@ -5,6 +5,30 @@
 #include "Blueprint/UserWidget.h"
 #include "ProceduralContentProcessor.generated.h"
 
+UENUM()
+enum EObjectPropertyChangeType : uint32
+{
+	Unspecified = 1 << 0,
+	//Array Add
+	ArrayAdd = 1 << 1,
+	//Array Remove
+	ArrayRemove = 1 << 2,
+	//Array Clear
+	ArrayClear = 1 << 3,
+	//Value Set
+	ValueSet = 1 << 4,
+	//Duplicate
+	Duplicate = 1 << 5,
+	//Interactive, e.g. dragging a slider. Will be followed by a ValueSet when finished.
+	Interactive = 1 << 6,
+	//Redirected.  Used when property references are updated due to content hot-reloading, or an asset being replaced during asset deletion (aka, asset consolidation).
+	Redirected = 1 << 7,
+	// Array Item Moved Within the Array
+	ArrayMove = 1 << 8,
+	// Edit Condition State has changed
+	ToggleEditable = 1 << 9,
+};
+
 UCLASS(Abstract, Blueprintable, EditInlineNew, CollapseCategories, config = ProceduralContentProcessor, defaultconfig)
 class PROCEDURALCONTENTPROCESSOR_API UProceduralContentProcessor: public UObject {
 	GENERATED_BODY()
@@ -19,7 +43,7 @@ public:
 	void ReceiveDeactivate();
 
 	UFUNCTION(BlueprintImplementableEvent, Category = "ProceduralContentProcessor", meta = (DisplayName = "PostEditChangeProperty"))
-	void ReceivePostEditChangeProperty(FName PropertyName);
+	void ReceivePostEditChangeProperty(FName PropertyName, EObjectPropertyChangeType PropertyChangeType);
 
 	virtual void Activate();
 
@@ -28,7 +52,7 @@ public:
 	virtual void Deactivate();
 
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override{
-		ReceivePostEditChangeProperty(PropertyChangedEvent.GetPropertyName());
+		ReceivePostEditChangeProperty(PropertyChangedEvent.GetPropertyName(), EObjectPropertyChangeType(PropertyChangedEvent.ChangeType));
 		TryUpdateDefaultConfigFile();
 	}
 
