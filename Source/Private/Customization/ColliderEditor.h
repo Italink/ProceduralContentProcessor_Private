@@ -4,7 +4,7 @@
 #include "ColliderEditor.generated.h"
 
 
-UCLASS(Abstract, EditInlineNew, CollapseCategories, Blueprintable, BlueprintType, config = ProceduralContentProcessor, defaultconfig )
+UCLASS(Abstract, DefaultToInstanced, EditInlineNew, CollapseCategories, Blueprintable, BlueprintType, config = ProceduralContentProcessor, defaultconfig )
 class PROCEDURALCONTENTPROCESSOR_API UCollisionMeshGenerateMethodBase : public UObject
 {
 	GENERATED_BODY()
@@ -15,7 +15,7 @@ public:
 	UPROPERTY(EditAnywhere, Config)
 	bool bRemoveSourceMeshCollision = true;
 
-	virtual AStaticMeshActor* Generate(TArray<AActor*> InActors) { return nullptr; };
+	virtual AStaticMeshActor* Generate(TArray<UStaticMeshComponent*> SourceMeshCompList) { return nullptr; };
 };
 
 UCLASS(meta = (DisplayName = "Approximate"), CollapseCategories)
@@ -23,7 +23,7 @@ class PROCEDURALCONTENTPROCESSOR_API UCollisionMeshGenerateMethod_Approximate : 
 {
 	GENERATED_BODY()
 public:
-	virtual AStaticMeshActor* Generate(TArray<AActor*> InActors) override;
+	virtual AStaticMeshActor* Generate(TArray<UStaticMeshComponent*> SourceMeshCompList) override;
 
 	UPROPERTY(EditAnywhere, Config)
 	FMeshApproximationSettings ApproximationSettings;
@@ -34,7 +34,7 @@ class PROCEDURALCONTENTPROCESSOR_API UCollisionMeshGenerateMethod_Proxy : public
 {
 	GENERATED_BODY()
 public:
-	virtual AStaticMeshActor* Generate(TArray<AActor*> InActors) override;
+	virtual AStaticMeshActor* Generate(TArray<UStaticMeshComponent*> SourceMeshCompList) override;
 
 	UPROPERTY( EditAnywhere, Config, meta = (ClampMin = "1", ClampMax = "1200", UIMin = "1", UIMax = "1200"))
 	int32 ScreenSize = 50;
@@ -74,7 +74,7 @@ private:
 	TArray<TObjectPtr<UStaticMesh>> SourceMeshes;
 
 	UPROPERTY(EditAnywhere, Instanced, NoClear, meta = (ShowOnlyInnerProperties))
-	UCollisionMeshGenerateMethodBase* GenerateMethod = NewObject<UCollisionMeshGenerateMethod_Proxy>();
+	UCollisionMeshGenerateMethodBase* GenerateMethod = NewObject<UCollisionMeshGenerateMethod_Approximate>();
 
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<AStaticMeshActor> ColliderActor;
