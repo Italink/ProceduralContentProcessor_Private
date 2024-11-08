@@ -1,4 +1,4 @@
-﻿#include "ColliderEditor.h"
+﻿#include "CollisionProxyEditor.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "AssetToolsModule.h"
 #include "Engine/StaticMeshActor.h"
@@ -24,7 +24,7 @@
 #include "EditorSupportDelegates.h"
 #include "MaterialEditingLibrary.h"
 
-AStaticMeshActor* UCollisionMeshGenerateMethod_Proxy::Generate(TArray<UStaticMeshComponent*> SourceMeshCompList)
+AStaticMeshActor* UCollisionProxyGenerateMethod_Proxy::Generate(TArray<UStaticMeshComponent*> SourceMeshCompList)
 {
 	const IMeshMergeUtilities& MeshMergeUtilities = FModuleManager::Get().LoadModuleChecked<IMeshMergeModule>("MeshMergeUtilities").GetUtilities();
 	
@@ -258,15 +258,15 @@ AStaticMeshActor* UCollisionMeshGenerateMethod_Proxy::Generate(TArray<UStaticMes
 	return StaticMeshActor;
 }
 
-void UColliderEditor::Activate()
+void UCollisionProxyEditor::Activate()
 {
 	FLevelEditorModule& LevelEditor = FModuleManager::GetModuleChecked<FLevelEditorModule>("LevelEditor");
-	OnActorSelectionChangedHandle = LevelEditor.OnActorSelectionChanged().AddUObject(this, &UColliderEditor::OnActorSelectionChanged);
+	OnActorSelectionChangedHandle = LevelEditor.OnActorSelectionChanged().AddUObject(this, &UCollisionProxyEditor::OnActorSelectionChanged);
 	TArray<UObject*> Objects;
 	GEditor->GetSelectedActors()->GetSelectedObjects(Objects);
 	OnActorSelectionChanged(Objects, true);
 	if (!DebugMaterial.IsValid()) {
-		DebugMaterial = LoadObject<UMaterialInstanceConstant>(nullptr, TEXT("/ProceduralContentProcessor/WorldProcessor/Collider/MI_CollisionMesh.MI_CollisionMesh"));
+		DebugMaterial = LoadObject<UMaterialInstanceConstant>(nullptr, TEXT("/ProceduralContentProcessor/WorldProcessor/CollisionProxy/MI_CollisionProxy.MI_CollisionProxy"));
 	}
 	if(auto DebugMaterialObject = Cast<UMaterialInstanceConstant>(DebugMaterial.TryLoad())){
 		DebugMaterialObject->SetScalarParameterValueEditorOnly(FName("Opacity"), 0.5);;
@@ -274,7 +274,7 @@ void UColliderEditor::Activate()
 	}
 }
 
-void UColliderEditor::Deactivate()
+void UCollisionProxyEditor::Deactivate()
 {
 	if (OnActorSelectionChangedHandle.IsValid()) {
 		FLevelEditorModule& LevelEditor = FModuleManager::GetModuleChecked<FLevelEditorModule>("LevelEditor");
@@ -287,7 +287,7 @@ void UColliderEditor::Deactivate()
 	}
 }
 
-void UColliderEditor::OnActorSelectionChanged(const TArray<UObject*>& NewSelection, bool bForceRefresh)
+void UCollisionProxyEditor::OnActorSelectionChanged(const TArray<UObject*>& NewSelection, bool bForceRefresh)
 {
 	SourceActors.Reset();
 	SourceMeshes.Reset();
@@ -306,10 +306,10 @@ void UColliderEditor::OnActorSelectionChanged(const TArray<UObject*>& NewSelecti
 			SourceActors.AddUnique(Actor);
 		}
 	}
-	RefreshColliderFinder();
+	RefreshCollisionProxyFinder();
 }
 
-void UColliderEditor::Generate()
+void UCollisionProxyEditor::Generate()
 {
 	if(SourceActors.IsEmpty() || SourceMeshes.IsEmpty() || GenerateMethod == nullptr)
 		return;
@@ -327,54 +327,54 @@ void UColliderEditor::Generate()
 			}
 		}
 	}
-	AStaticMeshActor* Collider = GenerateMethod->Generate(SourceMeshCompList);
-	if(Collider == nullptr)
+	AStaticMeshActor* CollisionProxy = GenerateMethod->Generate(SourceMeshCompList);
+	if(CollisionProxy == nullptr)
 		return;
 	GEditor->ForceGarbageCollection(true);
-	Collider->Modify();
-	Collider->SetActorHiddenInGame(true);
-	Collider->SetFolderPath("Collision");
+	CollisionProxy->Modify();
+	CollisionProxy->SetActorHiddenInGame(true);
+	CollisionProxy->SetFolderPath("Collision");
 	for (auto Actor : FilterActors) {
-		Collider->Tags.AddUnique(*Actor->GetActorGuid().ToString());
+		CollisionProxy->Tags.AddUnique(*Actor->GetActorGuid().ToString());
 	}
-	UStaticMesh* ColliderMesh = Collider->GetStaticMeshComponent()->GetStaticMesh();
-	if (ColliderMesh) {
+	UStaticMesh* CollisionProxyMesh = CollisionProxy->GetStaticMeshComponent()->GetStaticMesh();
+	if (CollisionProxyMesh) {
 		if (auto DebugMaterialObject = Cast<UMaterialInstanceConstant>(DebugMaterial.TryLoad())) {
-			for (int i = 0; i < ColliderMesh->GetStaticMaterials().Num(); i++) {
-				ColliderMesh->SetMaterial(i, DebugMaterialObject);
+			for (int i = 0; i < CollisionProxyMesh->GetStaticMaterials().Num(); i++) {
+				CollisionProxyMesh->SetMaterial(i, DebugMaterialObject);
 			}
 		}
-		ColliderMesh->bCustomizedCollision = true;
-		ColliderMesh->ComplexCollisionMesh = ColliderMesh;
-		ColliderMesh->GetBodySetup()->CollisionTraceFlag = ECollisionTraceFlag::CTF_UseComplexAsSimple;
-		VertexCount = ColliderMesh->GetNumVertices(0);
-		TriangleCount = ColliderMesh->GetNumTriangles(0);
+		CollisionProxyMesh->bCustomizedCollision = true;
+		CollisionProxyMesh->ComplexCollisionMesh = CollisionProxyMesh;
+		CollisionProxyMesh->GetBodySetup()->CollisionTraceFlag = ECollisionTraceFlag::CTF_UseComplexAsSimple;
+		VertexCount = CollisionProxyMesh->GetNumVertices(0);
+		TriangleCount = CollisionProxyMesh->GetNumTriangles(0);
 	}
 	GEditor->GetSelectedActors()->Modify();
 	GEditor->GetSelectedActors()->BeginBatchSelectOperation();
 	GEditor->SelectNone(false, true, true);
-	GEditor->SelectActor(Collider, true, false, true);
+	GEditor->SelectActor(CollisionProxy, true, false, true);
 	GEditor->GetSelectedActors()->EndBatchSelectOperation(/*bNotify*/false);
 	GEditor->NoteSelectionChange();
-	RefreshColliderFinder();
+	RefreshCollisionProxyFinder();
 }
 
-void UColliderEditor::RefreshColliderFinder()
+void UCollisionProxyEditor::RefreshCollisionProxyFinder()
 {
 	UWorld* World = GEditor->GetEditorWorldContext().World();
-	ColliderFinder.Reset();
+	CollisionProxyFinder.Reset();
 	TArray<AActor*> Actors;
 	UGameplayStatics::GetAllActorsOfClass(World, AStaticMeshActor::StaticClass(), Actors);
 	for (auto Actor : Actors) {
 		if (Actor->GetFolderPath().ToString().StartsWith("Collision")) {
 			for (auto Tag : Actor->Tags) {
-				ColliderFinder.Add(FGuid(Tag.ToString()), Actor);
+				CollisionProxyFinder.Add(FGuid(Tag.ToString()), Actor);
 			}
 		}
 	}
 }
 
-AStaticMeshActor* UCollisionMeshGenerateMethod_Approximate::Generate(TArray<UStaticMeshComponent*> SourceMeshCompList)
+AStaticMeshActor* UCollisionProxyGenerateMethod_Approximate::Generate(TArray<UStaticMeshComponent*> SourceMeshCompList)
 {
 	const IMeshMergeUtilities& MeshMergeUtilities = FModuleManager::Get().LoadModuleChecked<IMeshMergeModule>("MeshMergeUtilities").GetUtilities();
 
@@ -453,7 +453,11 @@ AStaticMeshActor* UCollisionMeshGenerateMethod_Approximate::Generate(TArray<USta
 		for (int i = 0; i < MergedStaticMesh->GetStaticMaterials().Num(); i++) {
 			MergedStaticMesh->SetMaterial(i, nullptr);
 		}
+#if ENGINE_MAJOR_VERSION >=5 && ENGINE_MINOR_VERSION >= 4
 		TArray<TObjectPtr<AActor>> Actors;
+#else
+		TArray<AActor*> Actors;
+#endif
 		StaticMeshActor->GetStaticMeshComponent()->SetStaticMesh(MergedStaticMesh);
 		StaticMeshActor->SetActorTransform(FTransform());
 		Actors.Add(StaticMeshActor);

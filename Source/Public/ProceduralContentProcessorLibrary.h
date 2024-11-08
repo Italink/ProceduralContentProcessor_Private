@@ -63,9 +63,6 @@ public:
 	bool bEnabled = false;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
-	ENiagaraEmitterMode Mode = ENiagaraEmitterMode::Standard;
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	FVersionedNiagaraEmitterData Data;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
@@ -200,9 +197,6 @@ public:
 
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "ProceduralContentProcessor")
 	static UStaticMeshEditorSubsystem* GetStaticMeshEditorSubsystem();
-
-	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
-	static TArray<FStaticMeshChainNode> GetStaticMeshLODChain(UStaticMesh* InStaticMesh, bool bUseDistance = false, bool bEnableBuildSetting = false);
 
 	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
 	static float GetLodScreenSize(UStaticMesh* InStaticMesh, int32 LODIndex);

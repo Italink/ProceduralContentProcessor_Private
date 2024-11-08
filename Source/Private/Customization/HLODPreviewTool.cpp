@@ -1,4 +1,4 @@
-﻿#include "HLODPreview.h"
+﻿#include "HLODPreviewTool.h"
 #include "Widgets/SCanvas.h"
 #include "Widgets/Input/SSlider.h"
 #include "Widgets/Input/STextComboBox.h"
@@ -439,7 +439,11 @@ FReply SHLODOutliner::OnBlockClicked(FActorDescInfo& Info)
 		Info.bIsPreview = true;
 		Actor->SetIsTemporarilyHiddenInEditor(false);
 		for (auto SourceActor : SourceActors->GetActors()) {
+#if ENGINE_MAJOR_VERSION >=5 && ENGINE_MINOR_VERSION >= 4
 			if (FWorldPartitionActorDesc* SourceActorDesc = WorldPartition->GetActorDescContainer()->GetActorDesc(SourceActor.ActorInstanceGuid)) {
+#else
+			if (FWorldPartitionActorDesc* SourceActorDesc = WorldPartition->GetActorDescContainer()->GetActorDesc(SourceActor.ActorGuid)) {
+#endif
 				AActor* Source = SourceActorDesc->GetActor();
 				if (Source) {
 					Source->SetIsTemporarilyHiddenInEditor(true);
@@ -454,7 +458,11 @@ FReply SHLODOutliner::OnBlockClicked(FActorDescInfo& Info)
 		GEditor->GetSelectedActors()->BeginBatchSelectOperation();
 		GEditor->SelectNone(false, true, true);
 		for (auto SourceActor : SourceActors->GetActors()) {
+#if ENGINE_MAJOR_VERSION >=5 && ENGINE_MINOR_VERSION >= 4
 			if (FWorldPartitionActorDesc* SourceActorDesc = WorldPartition->GetActorDescContainer()->GetActorDesc(SourceActor.ActorInstanceGuid)) {
+#else
+			if (FWorldPartitionActorDesc* SourceActorDesc = WorldPartition->GetActorDescContainer()->GetActorDesc(SourceActor.ActorGuid)) {
+#endif
 				if (!SourceActorDesc->IsLoaded()) {
 					WorldPartition->PinActors({ SourceActorDesc->GetGuid() });
 				}
@@ -516,7 +524,9 @@ void SHLODOutliner::OnSelectHLODSourceActor(TSharedPtr<FWorldPartitionActorDesc>
 	}
 }
 
-TSharedPtr<SWidget> UHLODPreview::BuildWidget()
+TSharedPtr<SWidget> UHLODPreviewTool::BuildWidget()
 {
 	return SAssignNew(HLODOutliner, SHLODOutliner);
 }
+
+#undef LOCTEXT_NAMESPACE

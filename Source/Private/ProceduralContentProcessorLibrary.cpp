@@ -487,23 +487,6 @@ UStaticMeshEditorSubsystem* UProceduralContentProcessorLibrary::GetStaticMeshEdi
 	return GEditor->GetEditorSubsystem<UStaticMeshEditorSubsystem>();
 }
 
-TArray<FStaticMeshChainNode> UProceduralContentProcessorLibrary::GetStaticMeshLODChain(UStaticMesh* InStaticMesh, bool bUseDistance /*= false*/, bool bEnableBuildSetting /*= false*/)
-{
-	TArray<FStaticMeshChainNode> Infos;
-	if (InStaticMesh == nullptr)
-		return Infos;
-	Infos.SetNum(InStaticMesh->GetNumSourceModels());
-	for (int i = 0; i < Infos.Num(); i++) {
-		Infos[i].bEnableBuildSetting = bEnableBuildSetting;
-		Infos[i].bUseDistance = bUseDistance;
-		Infos[i].BuildSettings = InStaticMesh->GetSourceModel(i).BuildSettings;
-		Infos[i].ReductionSettings = InStaticMesh->GetSourceModel(i).ReductionSettings;
-		Infos[i].ScreenSize = InStaticMesh->GetSourceModel(i).ScreenSize.GetValue();
-		Infos[i].Distance = GetLodDistance(InStaticMesh, i);
-	}
-	return Infos;
-}
-
 float UProceduralContentProcessorLibrary::GetLodScreenSize(UStaticMesh* InStaticMesh, int32 LODIndex)
 {
 	if (InStaticMesh == nullptr || LODIndex< 0 || LODIndex >= InStaticMesh->GetNumLODs() || InStaticMesh->GetRenderData() == nullptr)
@@ -515,9 +498,8 @@ float UProceduralContentProcessorLibrary::GetLodDistance(UStaticMesh* InStaticMe
 {
 	if(LODIndex == 0)
 		return 0;
-
-	const float FOV = 60.0f;
 	float ScreenSize = GetLodScreenSize(InStaticMesh, LODIndex);
+	const float FOV = 60.0f;
 	const float FOVRad = FOV * (float)UE_PI / 360.0f;
 	const FMatrix ProjectionMatrix = FPerspectiveMatrix(FOVRad, 1920, 1080, 0.01f);
 	const float ScreenMultiple = FMath::Max(0.5f * ProjectionMatrix.M[0][0], 0.5f * ProjectionMatrix.M[1][1]);
@@ -586,7 +568,6 @@ FNiagaraSystemInfo UProceduralContentProcessorLibrary::GetNiagaraSystemInformati
 		FNiagaraEmitterInfo EmitterInfo;
 		EmitterInfo.Name = EmitterHandle->GetName();
 		EmitterInfo.bEnabled = EmitterHandle->GetIsEnabled();
-		//EmitterInfo.Mode = EmitterHandle->GetEmitterMode();
 		EmitterInfo.Data = *EmitterHandle->GetEmitterData();
 		UNiagaraStackViewModel* StackViewModel = EmitterHandleViewModel->GetEmitterStackViewModel();
 		TArray<UNiagaraStackItemGroup*> StackItemGroups;

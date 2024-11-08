@@ -1,11 +1,11 @@
 #pragma once
 
 #include "ProceduralContentProcessor.h"
-#include "ColliderEditor.generated.h"
+#include "CollisionProxyEditor.generated.h"
 
 
 UCLASS(Abstract, DefaultToInstanced, EditInlineNew, CollapseCategories, Blueprintable, BlueprintType, config = ProceduralContentProcessor, defaultconfig )
-class PROCEDURALCONTENTPROCESSOR_API UCollisionMeshGenerateMethodBase : public UObject
+class PROCEDURALCONTENTPROCESSOR_API UCollisionProxyGenerateMethodBase : public UObject
 {
 	GENERATED_BODY()
 public:
@@ -19,7 +19,7 @@ public:
 };
 
 UCLASS(meta = (DisplayName = "Approximate"), CollapseCategories)
-class PROCEDURALCONTENTPROCESSOR_API UCollisionMeshGenerateMethod_Approximate : public UCollisionMeshGenerateMethodBase
+class PROCEDURALCONTENTPROCESSOR_API UCollisionProxyGenerateMethod_Approximate : public UCollisionProxyGenerateMethodBase
 {
 	GENERATED_BODY()
 public:
@@ -30,7 +30,7 @@ public:
 };
 
 UCLASS(meta = (DisplayName = "Proxy"), CollapseCategories)
-class PROCEDURALCONTENTPROCESSOR_API UCollisionMeshGenerateMethod_Proxy : public UCollisionMeshGenerateMethodBase
+class PROCEDURALCONTENTPROCESSOR_API UCollisionProxyGenerateMethod_Proxy : public UCollisionProxyGenerateMethodBase
 {
 	GENERATED_BODY()
 public:
@@ -54,8 +54,8 @@ public:
 	bool bOverrideVoxelSize = false;
 };
 
-UCLASS(EditInlineNew, CollapseCategories, config = ProceduralContentProcessor, defaultconfig, Category = "WorldPartition", meta = (DisplayName = "Collider Editor"))
-class UColliderEditor : public UProceduralWorldProcessor {
+UCLASS(EditInlineNew, CollapseCategories, config = ProceduralContentProcessor, defaultconfig, Category = "WorldPartition", meta = (DisplayName = "CollisionProxy Editor"))
+class UCollisionProxyEditor : public UProceduralWorldProcessor {
 	GENERATED_BODY()
 protected:
 	virtual void Activate() override;
@@ -65,7 +65,7 @@ protected:
 	UFUNCTION(CallInEditor)
 	void Generate();
 
-	void RefreshColliderFinder();
+	void RefreshCollisionProxyFinder();
 private:
 	UPROPERTY(EditAnywhere)
 	TArray<TObjectPtr<AActor>> SourceActors;
@@ -74,10 +74,10 @@ private:
 	TArray<TObjectPtr<UStaticMesh>> SourceMeshes;
 
 	UPROPERTY(EditAnywhere, Instanced, NoClear, meta = (ShowOnlyInnerProperties))
-	UCollisionMeshGenerateMethodBase* GenerateMethod = NewObject<UCollisionMeshGenerateMethod_Approximate>();
+	UCollisionProxyGenerateMethodBase* GenerateMethod = NewObject<UCollisionProxyGenerateMethod_Approximate>();
 
 	UPROPERTY(VisibleAnywhere)
-	TObjectPtr<AStaticMeshActor> ColliderActor;
+	TObjectPtr<AStaticMeshActor> CollisionProxyActor;
 
 	UPROPERTY(EditAnywhere, Config)
 	FSoftObjectPath DebugMaterial;
@@ -90,6 +90,6 @@ private:
 
 	FDelegateHandle OnActorSelectionChangedHandle;
 
-	TMap<FGuid, TObjectPtr<AActor>> ColliderFinder;
+	TMap<FGuid, TObjectPtr<AActor>> CollisionProxyFinder;
 };
 
