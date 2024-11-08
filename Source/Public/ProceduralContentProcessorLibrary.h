@@ -2,7 +2,6 @@
 
 #include "CoreMinimal.h"
 #include "ProceduralObjectMatrix.h"
-#include "StaticMeshLODChain.h"
 #include "NiagaraSystem.h"
 #include "NiagaraEmitter.h"
 #include "Engine/TextureRenderTarget2D.h"
