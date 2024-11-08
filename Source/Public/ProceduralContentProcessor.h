@@ -94,15 +94,6 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
 	static void ActorSetRuntimeGrid(AActor* Actor, FName GridName);
-
-	//UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
-	//static bool HasImposter(AStaticMeshActor* InStaticMeshActor);
-
-	//UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
-	//static void SetStaticMeshLODChain(AStaticMeshActor* InStaticMeshActor, AActor* BP_Generate_ImposterSprites, TArray<FStaticMeshChainNode> InChain);
-
-	//UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
-	//static void ApplyImposterToLODChain(AStaticMeshActor* InStaticMeshActor, AActor* BP_Generate_ImposterSprites, int TargetLODIndex, float ScreenSize, FMeshImposterSettings ImposterSettings);
 protected:
 	virtual UWorld* GetWorld() const override;
 };
