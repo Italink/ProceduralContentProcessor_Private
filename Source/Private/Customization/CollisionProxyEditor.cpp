@@ -63,9 +63,14 @@ AStaticMeshActor* UCollisionProxyGenerateMethod_Proxy::Generate(TArray<UStaticMe
 	for (auto StaticMeshComp : SourceMeshCompList) {
 		SourceCompList.AddUnique(StaticMeshComp);
 		World = World ? World : StaticMeshComp->GetWorld();
-		if (bRemoveSourceMeshCollision) {
+		if (ClearMethod == ECollisionProxyClearMethod::CleanupSourceMeshCollision) {
 			UStaticMeshEditorSubsystem* StaticMeshEditorSubsystem = GEditor->GetEditorSubsystem<UStaticMeshEditorSubsystem>();
 			StaticMeshEditorSubsystem->RemoveCollisionsWithNotification(StaticMeshComp->GetStaticMesh(), true);
+		}
+		else if (ClearMethod == ECollisionProxyClearMethod::DisableSourceActorCollision) {
+			StaticMeshComp->Modify();
+			StaticMeshComp->SetCollisionProfileName(UCollisionProfile::NoCollision_ProfileName);
+			StaticMeshComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		}
 	}
 	
@@ -315,6 +320,7 @@ void UCollisionProxyEditor::Generate()
 		return;
 	TArray<UStaticMeshComponent*> SourceMeshCompList;
 	TArray<AActor*> FilterActors;
+	FString CollisionProxyName = "CollisionProxy";
 	for (auto Actor : SourceActors) {
 		if (Actor == nullptr || Actor->HasAnyFlags(RF_Transient))
 			continue;
@@ -326,6 +332,7 @@ void UCollisionProxyEditor::Generate()
 				}
 			}
 		}
+		CollisionProxyName += "_" + Actor->GetActorLabel();
 	}
 	AStaticMeshActor* CollisionProxy = GenerateMethod->Generate(SourceMeshCompList);
 	if(CollisionProxy == nullptr)
@@ -334,6 +341,14 @@ void UCollisionProxyEditor::Generate()
 	CollisionProxy->Modify();
 	CollisionProxy->SetActorHiddenInGame(true);
 	CollisionProxy->SetFolderPath("Collision");
+	CollisionProxy->SetActorLabel(CollisionProxyName);
+	UStaticMeshComponent* CollisionProxyComp = CollisionProxy->GetStaticMeshComponent();
+	CollisionProxyComp->SetHiddenInGame(true);
+	CollisionProxyComp->SetCastShadow(false);
+	CollisionProxyComp->SetAffectDistanceFieldLighting(false);
+	CollisionProxyComp->SetAffectDynamicIndirectLighting(false);
+	CollisionProxyComp->SetAffectIndirectLightingWhileHidden(false);
+
 	for (auto Actor : FilterActors) {
 		CollisionProxy->Tags.AddUnique(*Actor->GetActorGuid().ToString());
 	}
@@ -401,9 +416,14 @@ AStaticMeshActor* UCollisionProxyGenerateMethod_Approximate::Generate(TArray<USt
 	for (auto StaticMeshComp : SourceMeshCompList) {
 		SourceCompList.AddUnique(StaticMeshComp);
 		World = World ? World : StaticMeshComp->GetWorld();
-		if (bRemoveSourceMeshCollision) {
+		if (ClearMethod == ECollisionProxyClearMethod::CleanupSourceMeshCollision) {
 			UStaticMeshEditorSubsystem* StaticMeshEditorSubsystem = GEditor->GetEditorSubsystem<UStaticMeshEditorSubsystem>();
 			StaticMeshEditorSubsystem->RemoveCollisionsWithNotification(StaticMeshComp->GetStaticMesh(), true);
+		}
+		else if (ClearMethod == ECollisionProxyClearMethod::DisableSourceActorCollision) {
+			StaticMeshComp->Modify();
+			StaticMeshComp->SetCollisionProfileName(UCollisionProfile::NoCollision_ProfileName);
+			StaticMeshComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		}
 	}
 

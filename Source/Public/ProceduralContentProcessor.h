@@ -5,9 +5,11 @@
 #include "Blueprint/UserWidget.h"
 #include "ProceduralContentProcessor.generated.h"
 
-UENUM()
-enum EObjectPropertyChangeType : uint32
+
+UENUM(BlueprintType, meta = (Bitflags, UseEnumValuesAsMaskValuesInEditor = "true"))
+enum EObjectPropertyChangeType : uint64
 {
+	None = 0, 
 	Unspecified = 1 << 0,
 	//Array Add
 	ArrayAdd = 1 << 1,

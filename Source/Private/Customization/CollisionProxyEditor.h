@@ -3,6 +3,12 @@
 #include "ProceduralContentProcessor.h"
 #include "CollisionProxyEditor.generated.h"
 
+UENUM()
+enum class ECollisionProxyClearMethod {
+	None,
+	DisableSourceActorCollision,
+	CleanupSourceMeshCollision
+};
 
 UCLASS(Abstract, DefaultToInstanced, EditInlineNew, CollapseCategories, Blueprintable, BlueprintType, config = ProceduralContentProcessor, defaultconfig )
 class PROCEDURALCONTENTPROCESSOR_API UCollisionProxyGenerateMethodBase : public UObject
@@ -13,7 +19,7 @@ public:
 	bool bMergeMaterials = true;
 
 	UPROPERTY(EditAnywhere, Config)
-	bool bRemoveSourceMeshCollision = true;
+	ECollisionProxyClearMethod ClearMethod = ECollisionProxyClearMethod::DisableSourceActorCollision;
 
 	virtual AStaticMeshActor* Generate(TArray<UStaticMeshComponent*> SourceMeshCompList) { return nullptr; };
 };
