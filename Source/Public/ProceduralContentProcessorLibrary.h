@@ -204,7 +204,13 @@ public:
 	static float GetLodDistance(UStaticMesh* InStaticMesh, int32 LODIndex);
 
 	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
-	static float ConvertDistanceToScreenSize(float ObjectSphereRadius, float Distance);
+	static float CalcLodDistance(float ObjectSphereRadius, float ScreenSize);
+
+	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
+	static float CalcScreenSize(float ObjectSphereRadius, float Distance);
+
+	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
+	static float CalcObjectSphereRadius(float ScreenSize, float Distance);
 
 	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
 	static UTexture* ConstructTexture2D(UTextureRenderTarget2D* TextureRenderTarget2D, UObject* Outer, FString Name, TextureCompressionSettings CompressionSettings = TC_Default);

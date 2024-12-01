@@ -60,7 +60,7 @@ class PROCEDURALCONTENTPROCESSOR_API ULODEditor: public UProceduralWorldProcesso
 public:
 	ULODEditor();
 
-	UPROPERTY(EditAnywhere, Config)
+	UPROPERTY(EditAnywhere, Config, meta = (AllowedClasses = "/Script/Engine.UStaticMesh"))
 	TArray<FSoftObjectPath> StaticMeshes;
 
 	UPROPERTY(EditAnywhere, Config)
@@ -87,11 +87,11 @@ public:
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<AActor>> PreviewActors;
 
-	UFUNCTION(BlueprintCallable, CallInEditor)
-	void GenerateLODForSelectedStaticMesh();
+	UFUNCTION(BlueprintCallable, CallInEditor , meta = (DisplayPriority = 2))
+	void GenerateLOD_ForSelectedStaticMesh();
 
-	UFUNCTION(BlueprintCallable, CallInEditor)
-	void SpawnStaticMeshPreview();
+	UFUNCTION(BlueprintCallable, CallInEditor, meta = (DisplayPriority = 1))
+	void GenerateStaticMeshesPreview();
 
 	virtual void Activate() override;
 	virtual void Deactivate() override;

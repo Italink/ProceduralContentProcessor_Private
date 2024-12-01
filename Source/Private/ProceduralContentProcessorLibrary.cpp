@@ -499,7 +499,7 @@ float UProceduralContentProcessorLibrary::GetLodDistance(UStaticMesh* InStaticMe
 	if(LODIndex == 0)
 		return 0;
 	float ScreenSize = GetLodScreenSize(InStaticMesh, LODIndex);
-	const float FOV = 60.0f;
+	const float FOV = 90.0f;
 	const float FOVRad = FOV * (float)UE_PI / 360.0f;
 	const FMatrix ProjectionMatrix = FPerspectiveMatrix(FOVRad, 1920, 1080, 0.01f);
 	const float ScreenMultiple = FMath::Max(0.5f * ProjectionMatrix.M[0][0], 0.5f * ProjectionMatrix.M[1][1]);
@@ -507,16 +507,32 @@ float UProceduralContentProcessorLibrary::GetLodDistance(UStaticMesh* InStaticMe
 	return ComputeBoundsDrawDistance(ScreenSize, InStaticMesh->GetBounds().SphereRadius, ProjectionMatrix);
 }
 
-float UProceduralContentProcessorLibrary::ConvertDistanceToScreenSize(float ObjectSphereRadius, float Distance)
+float UProceduralContentProcessorLibrary::CalcLodDistance(float ObjectSphereRadius, float ScreenSize)
 {
-	const float FOV = 60.0f;
+	const float FOV = 90.0f;
 	const float FOVRad = FOV * (float)UE_PI / 360.0f;
 	const FMatrix ProjectionMatrix = FPerspectiveMatrix(FOVRad, 1920, 1080, 0.01f);
 	const float ScreenMultiple = FMath::Max(0.5f * ProjectionMatrix.M[0][0], 0.5f * ProjectionMatrix.M[1][1]);
-	if (Distance <= 0.000001f) {
-		return 2.0f;
-	}
+	const float ScreenRadius = FMath::Max(UE_SMALL_NUMBER, ScreenSize * 0.5f);
+	return ComputeBoundsDrawDistance(ScreenSize, ObjectSphereRadius, ProjectionMatrix);
+}
+
+float UProceduralContentProcessorLibrary::CalcScreenSize(float ObjectSphereRadius, float Distance)
+{
+	const float FOV = 90.0f;
+	const float FOVRad = FOV * (float)UE_PI / 360.0f;
+	const FMatrix ProjectionMatrix = FPerspectiveMatrix(FOVRad, 1920, 1080, 0.01f);
+	const float ScreenMultiple = FMath::Max(0.5f * ProjectionMatrix.M[0][0], 0.5f * ProjectionMatrix.M[1][1]);
 	return  2.0f * ScreenMultiple * ObjectSphereRadius / FMath::Max(1.0f, Distance);
+}
+
+float UProceduralContentProcessorLibrary::CalcObjectSphereRadius(float ScreenSize, float Distance)
+{
+	const float FOV = 90.0f;
+	const float FOVRad = FOV * (float)UE_PI / 360.0f;
+	const FMatrix ProjectionMatrix = FPerspectiveMatrix(FOVRad, 1920, 1080, 0.01f);
+	const float ScreenMultiple = FMath::Max(0.5f * ProjectionMatrix.M[0][0], 0.5f * ProjectionMatrix.M[1][1]);
+	return ScreenSize / (2.0f * ScreenMultiple / FMath::Max(1.0f, Distance));
 }
 
 UTexture* UProceduralContentProcessorLibrary::ConstructTexture2D(UTextureRenderTarget2D* TextureRenderTarget2D, UObject* Outer, FString Name /*= NAME_None*/, TextureCompressionSettings CompressionSettings)

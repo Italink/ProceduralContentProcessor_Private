@@ -22,11 +22,13 @@ ULODEditor::ULODEditor()
 
 }
 
-void ULODEditor::SpawnStaticMeshPreview()
+void ULODEditor::GenerateStaticMeshesPreview()
 {
 	if (!PreviewActors.IsEmpty()) {
 		for (auto Actor : PreviewActors) {
-			Actor->Destroy();
+			if (Actor) {
+				Actor->Destroy();
+			}
 		}
 		PreviewActors.Reset();
 	}
@@ -38,7 +40,7 @@ void ULODEditor::SpawnStaticMeshPreview()
 			for (int Y = 0; Y < StaticMesh->GetNumLODs(); Y++) {
 				float ScreenSize = UProceduralContentProcessorLibrary::GetLodScreenSize(StaticMesh, Y);
 				float YOffset = UProceduralContentProcessorLibrary::GetLodDistance(StaticMesh, Y);
-				AStaticMeshActor* PreviewActor = World->SpawnActor<AStaticMeshActor>(FVector(XOffset, YOffset, Bound.BoxExtent.Z), FRotator());
+				AStaticMeshActor* PreviewActor = World->SpawnActor<AStaticMeshActor>(FVector(XOffset, YOffset, Bound.BoxExtent.Z - Bound.Origin.Z), FRotator());
 				PreviewActor->GetStaticMeshComponent()->SetStaticMesh(StaticMesh);
 				PreviewActor->GetStaticMeshComponent()->ForcedLodModel = Y + 1;
 
@@ -57,7 +59,7 @@ void ULODEditor::SpawnStaticMeshPreview()
 	}
 }
 
-void ULODEditor::GenerateLODForSelectedStaticMesh()
+void ULODEditor::GenerateLOD_ForSelectedStaticMesh()
 {
 	if (SelectedStaticMeshActor == nullptr)
 			return;
