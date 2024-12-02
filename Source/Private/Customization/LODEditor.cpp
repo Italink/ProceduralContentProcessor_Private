@@ -16,6 +16,7 @@
 #include "Materials/MaterialInstanceConstant.h"
 #include "Framework/Notifications/NotificationManager.h"
 #include "Widgets/Notifications/SNotificationList.h"
+#include "Kismet/GameplayStatics.h"
 
 ULODEditor::ULODEditor()
 {
@@ -32,27 +33,58 @@ void ULODEditor::SpawnStaticMeshPreview()
 	}
 	UWorld* World = GetWorld();
 	float XOffset = 0;
-	for (auto MeshPath : StaticMeshes) {
-		if (UStaticMesh* StaticMesh = Cast<UStaticMesh>(MeshPath.TryLoad())) {
-			const FBoxSphereBounds& Bound = StaticMesh->GetBounds();
-			for (int Y = 0; Y < StaticMesh->GetNumLODs(); Y++) {
-				float ScreenSize = UProceduralContentProcessorLibrary::GetLodScreenSize(StaticMesh, Y);
-				float YOffset = UProceduralContentProcessorLibrary::GetLodDistance(StaticMesh, Y);
-				AStaticMeshActor* PreviewActor = World->SpawnActor<AStaticMeshActor>(FVector(XOffset, YOffset, Bound.BoxExtent.Z), FRotator());
-				PreviewActor->GetStaticMeshComponent()->SetStaticMesh(StaticMesh);
-				PreviewActor->GetStaticMeshComponent()->ForcedLodModel = Y + 1;
+	for (auto StaticMesh : StaticMeshes) {
+		const FBoxSphereBounds& Bound = StaticMesh->GetBounds();
+		for (int Y = 0; Y < StaticMesh->GetNumLODs(); Y++) {
+			float ScreenSize = UProceduralContentProcessorLibrary::GetLodScreenSize(StaticMesh, Y);
+			float YOffset = UProceduralContentProcessorLibrary::GetLodDistance(StaticMesh, Y);
+			AStaticMeshActor* PreviewActor = World->SpawnActor<AStaticMeshActor>(FVector(XOffset, YOffset, Bound.BoxExtent.Z), FRotator());
+			PreviewActor->GetStaticMeshComponent()->SetStaticMesh(StaticMesh);
+			PreviewActor->GetStaticMeshComponent()->ForcedLodModel = Y + 1;
 
-				PreviewActor->SetFlags(RF_Transient);
-				PreviewActor->SetActorLabel(FString::Printf(TEXT("LODPreviewActor[%s]:LOD%d"), *StaticMesh->GetName(), Y));
-				ATextRenderActor* TextActor = World->SpawnActor<ATextRenderActor>(FVector(XOffset, YOffset, Bound.SphereRadius * 2 + 100.0f), FRotator(0, -90.0f, 0));
-				TextActor->SetFlags(RF_Transient);
-				TextActor->AttachToActor(PreviewActor, FAttachmentTransformRules::KeepWorldTransform);
-				TextActor->GetTextRender()->SetText(FText::FromString( FString::Printf(TEXT("LOD%d\nScreen Size:%f\nDistance:%d\nVertices:%d\nTriangles:%d"), Y, ScreenSize, (int)YOffset, StaticMesh->GetNumVertices(Y), StaticMesh->GetNumTriangles(Y))));
-				TextActor->GetTextRender()->SetHorizontalAlignment(EHTA_Center);
-				PreviewActors.Add(PreviewActor);
-				PreviewActors.Add(TextActor);
+			PreviewActor->SetFlags(RF_Transient);
+			PreviewActor->SetActorLabel(FString::Printf(TEXT("LODPreviewActor[%s]:LOD%d"), *StaticMesh->GetName(), Y));
+			ATextRenderActor* TextActor = World->SpawnActor<ATextRenderActor>(FVector(XOffset, YOffset, Bound.SphereRadius * 2 + 100.0f), FRotator(0, -90.0f, 0));
+			TextActor->SetFlags(RF_Transient);
+			TextActor->AttachToActor(PreviewActor, FAttachmentTransformRules::KeepWorldTransform);
+			TextActor->GetTextRender()->SetText(FText::FromString(FString::Printf(TEXT("LOD%d\nScreen Size:%f\nDistance:%d\nVertices:%d\nTriangles:%d"), Y, ScreenSize, (int)YOffset, StaticMesh->GetNumVertices(Y), StaticMesh->GetNumTriangles(Y))));
+			TextActor->GetTextRender()->SetHorizontalAlignment(EHTA_Center);
+			PreviewActors.Add(PreviewActor);
+			PreviewActors.Add(TextActor);
+		}
+		XOffset += Bound.SphereRadius * 2 + 200.0f;
+	}
+}
+
+void ULODEditor::Collect()
+{
+	UWorld* World = GetWorld();
+	TArray<AActor*> Actors;
+	UGameplayStatics::GetAllActorsOfClass(World, AActor::StaticClass(), Actors);
+	for (auto Actor : Actors) {
+		for (auto Comp : Actor->GetComponents()) {
+			if (auto StaticMeshComp = Cast<UStaticMeshComponent>(Comp)) {
+				UStaticMesh* StaitcMesh = StaticMeshComp->GetStaticMesh();
+				if (StaitcMesh->GetPathName().Contains("EuropeanHor")) {
+					StaticMeshes.AddUnique(StaitcMesh);
+				}
 			}
-			XOffset += Bound.SphereRadius * 2 + 200.0f;
+		}
+	}
+}
+
+void ULODEditor::ApplayAll()
+{
+	TSet<UStaticMesh*> VisitedSet;
+	for (auto Actor : PreviewActors) {
+		if (auto StaticMeshActor = Cast<AStaticMeshActor>(Actor)) {
+			UStaticMesh* StaticMesh = StaticMeshActor->GetStaticMeshComponent()->GetStaticMesh();
+			if (!VisitedSet.Contains(StaticMesh)) {
+				VisitedSet.Add(StaticMesh);
+				UProceduralContentProcessorLibrary::SetNaniteMeshEnabled(StaticMeshActor->GetStaticMeshComponent()->GetStaticMesh(), false);
+				SelectedStaticMeshActor = StaticMeshActor;
+				GenerateLODForSelectedStaticMesh();
+			}
 		}
 	}
 }
@@ -73,7 +105,7 @@ void ULODEditor::GenerateLODForSelectedStaticMesh()
 		bStaticMeshIsEdited = true;
 	}
 		
-	const float FOV = 60.0f;
+	const float FOV = 90.0f;
 	const float FOVRad = FOV * (float)UE_PI / 360.0f;
 	const FMatrix ProjectionMatrix = FPerspectiveMatrix(FOVRad, 1920, 1080, 0.01f);
 		
@@ -157,6 +189,10 @@ void ULODEditor::Activate()
 	TArray<UObject*> Objects;
 	GEditor->GetSelectedActors()->GetSelectedObjects(Objects);
 	OnActorSelectionChanged(Objects, true);
+	StaticMeshes.Reset();
+	for (auto MeshPath : StaticMeshesForConfig) {
+		StaticMeshes.AddUnique(Cast<UStaticMesh>(MeshPath.TryLoad()));
+	}
 }
 
 void ULODEditor::Deactivate()
@@ -166,6 +202,11 @@ void ULODEditor::Deactivate()
 		LevelEditor.OnActorSelectionChanged().Remove(OnActorSelectionChangedHandle);
 		OnActorSelectionChangedHandle.Reset();
 	}
+	StaticMeshesForConfig.Reset();
+	for (auto Mesh : StaticMeshes) {
+		StaticMeshesForConfig.AddUnique(Mesh);
+	}
+	TryUpdateDefaultConfigFile();
 }
 
 void ULODEditor::OnActorSelectionChanged(const TArray<UObject*>& NewSelection, bool bForceRefresh)

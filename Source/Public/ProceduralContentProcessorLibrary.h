@@ -98,7 +98,7 @@ public:
 
 
 	// Object Interface:
-
+	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
 	static bool ObjectIsAsset(const UObject* InObject);
 
 	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
@@ -126,7 +126,10 @@ public:
 	static void ShowObjectDetailsView(UObject* InObject);
 
 	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
-	static UObject* CopyProperties(UObject* OldObject, UObject* NewObject);
+	static UObject* CopyProperties(UObject* SourceObject, UObject* TargetObject);
+
+	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
+	static void ForceReplaceReferences(UObject* SourceObjects, UObject* TargetObject);
 
 	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor", CustomThunk, meta = (CustomStructureParam = "Value", AutoCreateRefTerm = "Value"))
 	static void SetObjectPropertyByName(UObject* Object, FName PropertyName, const int& Value);
@@ -207,13 +210,19 @@ public:
 	static float ConvertDistanceToScreenSize(float ObjectSphereRadius, float Distance);
 
 	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
-	static UTexture* ConstructTexture2D(UTextureRenderTarget2D* TextureRenderTarget2D, UObject* Outer, FString Name, TextureCompressionSettings CompressionSettings = TC_Default);
+	static UTexture2D* ConstructTexture2D(UTextureRenderTarget2D* TextureRenderTarget2D, UObject* Outer, FString Name, TextureCompressionSettings CompressionSettings = TC_Default);
 
 	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
 	static void UpdateTexture2D(UTextureRenderTarget2D* TextureRenderTarget2D, UTexture2D* Texture);
 
 	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
 	static FNiagaraSystemInfo GetNiagaraSystemInformation(UNiagaraSystem * InNaigaraSystem);
+
+	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
+	static FVector2D ProjectWorldToScreen(const FVector& InWorldPos, bool bClampToScreenRectangle);
+
+	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
+	static bool DeprojectScreenToWorld(const FVector2D& InScreenPos, FVector& OutWorldOrigin, FVector& OutWorldDirection);
 
 	static TArray<TSharedPtr<FSlowTask>> SlowTasks;
 };

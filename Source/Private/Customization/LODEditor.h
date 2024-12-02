@@ -60,8 +60,11 @@ class PROCEDURALCONTENTPROCESSOR_API ULODEditor: public UProceduralWorldProcesso
 public:
 	ULODEditor();
 
-	UPROPERTY(EditAnywhere, Config)
-	TArray<FSoftObjectPath> StaticMeshes;
+	UPROPERTY(EditAnywhere)
+	TArray<TObjectPtr<UStaticMesh>> StaticMeshes;
+
+	UPROPERTY(Config)
+	TArray<FSoftObjectPath> StaticMeshesForConfig;
 
 	UPROPERTY(EditAnywhere, Config)
 	bool bUseDistance = true;
@@ -86,6 +89,13 @@ public:
 
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<AActor>> PreviewActors;
+
+	UFUNCTION(CallInEditor)
+	void Collect();
+
+	UFUNCTION(CallInEditor)
+	void ApplayAll();
+
 
 	UFUNCTION(BlueprintCallable, CallInEditor)
 	void GenerateLODForSelectedStaticMesh();

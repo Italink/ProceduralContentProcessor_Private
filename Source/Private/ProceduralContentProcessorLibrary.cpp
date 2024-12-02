@@ -38,6 +38,8 @@
 #include "ViewModels/Stack/NiagaraStackFunctionInput.h"
 #include "ViewModels/Stack/NiagaraStackItemGroup.h"
 #include "ViewModels/Stack/NiagaraStackRoot.h"
+#include "SLevelViewport.h"
+#include "TextureCompiler.h"
 
 #define LOCTEXT_NAMESPACE "ProceduralContentProcessor"
 
@@ -422,12 +424,20 @@ void UProceduralContentProcessorLibrary::ShowObjectDetailsView(UObject* InObject
 	}
 }
 
-UObject* UProceduralContentProcessorLibrary::CopyProperties(UObject* OldObject, UObject* NewObject)
+UObject* UProceduralContentProcessorLibrary::CopyProperties(UObject* SourceObject, UObject* TargetObject)
 {
+	if(SourceObject == nullptr || TargetObject == nullptr)
+		return nullptr;
 	UEngine::FCopyPropertiesForUnrelatedObjectsParams Params;
 	Params.bNotifyObjectReplacement = true;
-	UEngine::CopyPropertiesForUnrelatedObjects(OldObject, NewObject);
-	return NewObject;
+	UEngine::CopyPropertiesForUnrelatedObjects(SourceObject, TargetObject);
+	return TargetObject;
+}
+
+void UProceduralContentProcessorLibrary::ForceReplaceReferences(UObject* SourceObjects, UObject* TargetObject)
+{
+	TArray<UObject*> ObjectsToReplace(&TargetObject, 1);
+	ObjectTools::ForceReplaceReferences(SourceObjects, ObjectsToReplace);
 }
 
 DEFINE_FUNCTION(UProceduralContentProcessorLibrary::execSetObjectPropertyByName)
@@ -499,7 +509,7 @@ float UProceduralContentProcessorLibrary::GetLodDistance(UStaticMesh* InStaticMe
 	if(LODIndex == 0)
 		return 0;
 	float ScreenSize = GetLodScreenSize(InStaticMesh, LODIndex);
-	const float FOV = 60.0f;
+	const float FOV = 90.0f;
 	const float FOVRad = FOV * (float)UE_PI / 360.0f;
 	const FMatrix ProjectionMatrix = FPerspectiveMatrix(FOVRad, 1920, 1080, 0.01f);
 	const float ScreenMultiple = FMath::Max(0.5f * ProjectionMatrix.M[0][0], 0.5f * ProjectionMatrix.M[1][1]);
@@ -509,7 +519,7 @@ float UProceduralContentProcessorLibrary::GetLodDistance(UStaticMesh* InStaticMe
 
 float UProceduralContentProcessorLibrary::ConvertDistanceToScreenSize(float ObjectSphereRadius, float Distance)
 {
-	const float FOV = 60.0f;
+	const float FOV = 90.0f;
 	const float FOVRad = FOV * (float)UE_PI / 360.0f;
 	const FMatrix ProjectionMatrix = FPerspectiveMatrix(FOVRad, 1920, 1080, 0.01f);
 	const float ScreenMultiple = FMath::Max(0.5f * ProjectionMatrix.M[0][0], 0.5f * ProjectionMatrix.M[1][1]);
@@ -519,16 +529,19 @@ float UProceduralContentProcessorLibrary::ConvertDistanceToScreenSize(float Obje
 	return  2.0f * ScreenMultiple * ObjectSphereRadius / FMath::Max(1.0f, Distance);
 }
 
-UTexture* UProceduralContentProcessorLibrary::ConstructTexture2D(UTextureRenderTarget2D* TextureRenderTarget2D, UObject* Outer, FString Name /*= NAME_None*/, TextureCompressionSettings CompressionSettings)
+UTexture2D* UProceduralContentProcessorLibrary::ConstructTexture2D(UTextureRenderTarget2D* TextureRenderTarget2D, UObject* Outer, FString Name /*= NAME_None*/, TextureCompressionSettings CompressionSettings)
 {
-	if(TextureRenderTarget2D == nullptr)
+	if (TextureRenderTarget2D == nullptr)
 		return nullptr;
-	Outer = Outer ? Outer : GetTransientPackage();
-	UTexture* NewObj = TextureRenderTarget2D->ConstructTexture2D(Outer, Name, TextureRenderTarget2D->GetMaskedFlags() | RF_Public | RF_Standalone,
+	Outer = Outer ? Outer->GetPackage() : GetTransientPackage();
+	UTexture2D* NewObj = TextureRenderTarget2D->ConstructTexture2D(Outer, Name, TextureRenderTarget2D->GetMaskedFlags(),
 		static_cast<EConstructTextureFlags>(CTF_Default | CTF_SkipPostEdit), /*InAlphaOverride = */nullptr);
 	NewObj->CompressionSettings = CompressionSettings;
 	NewObj->MarkPackageDirty();
+
+#if WITH_EDITOR
 	NewObj->PostEditChange();
+#endif
 	return NewObj;
 }
 
@@ -587,6 +600,75 @@ FNiagaraSystemInfo UProceduralContentProcessorLibrary::GetNiagaraSystemInformati
 	}
 
 	return SystemInfo;
+}
+
+FVector2D UProceduralContentProcessorLibrary::ProjectWorldToScreen(const FVector& InWorldPos, bool bClampToScreenRectangle)
+{
+	FLevelEditorModule& LevelEditorModule = FModuleManager::GetModuleChecked<FLevelEditorModule>("LevelEditor");
+	TSharedPtr<ILevelEditor> LevelEditor = LevelEditorModule.GetFirstLevelEditor();
+	if (LevelEditor) {
+		TSharedPtr<SLevelViewport> ActiveLevelViewport = LevelEditor->GetActiveViewportInterface();
+		TSharedPtr<FEditorViewportClient> Client = ActiveLevelViewport->GetViewportClient();
+		FSceneViewFamilyContext ViewFamily(FSceneViewFamily::ConstructionValues(
+			Client->Viewport,
+			Client->GetScene(),
+			Client->EngineShowFlags));
+		// SceneView is deleted with the ViewFamily
+		FSceneView* SceneView = Client->CalcSceneView(&ViewFamily);
+
+		// Compute the MinP/MaxP in pixel coord, relative to View.ViewRect.Min
+		const FMatrix& WorldToView = SceneView->ViewMatrices.GetViewMatrix();
+		const FMatrix& ViewToProj = SceneView->ViewMatrices.GetProjectionMatrix();
+		const float NearClippingDistance = SceneView->NearClippingDistance + SMALL_NUMBER;
+		const FIntRect ViewRect = SceneView->UnconstrainedViewRect;
+
+		// Clamp position on the near plane to get valid rect even if bounds' points are behind the camera
+		FPlane P_View = WorldToView.TransformFVector4(FVector4(InWorldPos, 1.f));
+		if (P_View.Z <= NearClippingDistance)
+		{
+			P_View.Z = NearClippingDistance;
+		}
+
+		// Project from view to projective space
+		FVector2D MinP(FLT_MAX, FLT_MAX);
+		FVector2D MaxP(-FLT_MAX, -FLT_MAX);
+		FVector2D ScreenPos;
+		const bool bIsValid = FSceneView::ProjectWorldToScreen(P_View, ViewRect, ViewToProj, ScreenPos);
+
+		// Clamp to pixel border
+		ScreenPos = FIntPoint(FMath::FloorToInt(ScreenPos.X), FMath::FloorToInt(ScreenPos.Y));
+
+		// Clamp to screen rect
+		if (bClampToScreenRectangle)
+		{
+			ScreenPos.X = FMath::Clamp(ScreenPos.X, ViewRect.Min.X, ViewRect.Max.X);
+			ScreenPos.Y = FMath::Clamp(ScreenPos.Y, ViewRect.Min.Y, ViewRect.Max.Y);
+		}
+
+		return FVector2D(ScreenPos.X, ScreenPos.Y);
+	}
+	return FVector2D::ZeroVector;
+}
+
+bool UProceduralContentProcessorLibrary::DeprojectScreenToWorld(const FVector2D& InScreenPos, FVector& OutWorldOrigin, FVector& OutWorldDirection)
+{
+	FLevelEditorModule& LevelEditorModule = FModuleManager::GetModuleChecked<FLevelEditorModule>("LevelEditor");
+	TSharedPtr<ILevelEditor> LevelEditor = LevelEditorModule.GetFirstLevelEditor();
+	if (LevelEditor) {
+		TSharedPtr<SLevelViewport> ActiveLevelViewport = LevelEditor->GetActiveViewportInterface();
+		TSharedPtr<FEditorViewportClient> Client = ActiveLevelViewport->GetViewportClient();
+		FSceneViewFamilyContext ViewFamily(FSceneViewFamily::ConstructionValues(
+			Client->Viewport,
+			Client->GetScene(),
+			Client->EngineShowFlags));
+		// SceneView is deleted with the ViewFamily
+		FSceneView* SceneView = Client->CalcSceneView(&ViewFamily);
+		const FMatrix& InvViewProjectionMatrix = SceneView->ViewMatrices.GetInvViewProjectionMatrix();
+		const FIntRect ViewRect = SceneView->UnconstrainedViewRect;
+		FSceneView::DeprojectScreenToWorld(InScreenPos, ViewRect, InvViewProjectionMatrix, OutWorldOrigin, OutWorldDirection);
+		return true;
+	}
+	return false;
 }
 
 TArray<TSharedPtr<FSlowTask>> UProceduralContentProcessorLibrary::SlowTasks;

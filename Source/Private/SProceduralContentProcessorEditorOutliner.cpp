@@ -213,6 +213,7 @@ void SProceduralContentProcessorEditorOutliner::SetCurrentProcessor(UClass* InPr
 	if (InProcessorClass) {
 		UWorld* EditorWorld = GEditor->GetEditorWorldContext().World();
 		CurrentProcessor = NewObject<UProceduralContentProcessor>(EditorWorld != nullptr ? EditorWorld->GetPackage() : GetTransientPackage(), InProcessorClass, NAME_None, RF_Transient);
+		CurrentProcessor->LoadConfig();
 		CurrentProcessor->Activate();
 		ProcessorWidgetContainter->SetContent(CurrentProcessor->BuildWidget().ToSharedRef());
 		CurrentProcessorText = InProcessorClass->GetDisplayNameText();
