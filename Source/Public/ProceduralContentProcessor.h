@@ -59,6 +59,8 @@ public:
 	}
 
 	virtual TSharedPtr<SWidget> BuildWidget();
+
+	virtual TSharedPtr<SWidget> BuildToolBar();
 };
 
 UCLASS(Abstract, Blueprintable, EditInlineNew, CollapseCategories, config = ProceduralContentProcessor, defaultconfig)
@@ -134,8 +136,11 @@ public:
 	UFUNCTION(BlueprintNativeEvent, Category = "ProceduralContentProcessor", meta = (DisplayName = "Colour"))
 	FLinearColor Colour(const UPrimitiveComponent* PrimitiveComponent);
 
-protected:
-	void OnLevelActorListChanged();
-	void OnLevelActorAdded(AActor* InActor);
-	void OnLevelActorRemoved(AActor* InActor);
+	FReply OnVisibilityClicked();
+
+	void RefreshVisibility();
+
+	virtual TSharedPtr<SWidget> BuildToolBar() override;
+private:
+	bool bVisible = true;
 };

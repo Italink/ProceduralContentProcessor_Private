@@ -27,7 +27,9 @@ void ULODEditor::SpawnStaticMeshPreview()
 {
 	if (!PreviewActors.IsEmpty()) {
 		for (auto Actor : PreviewActors) {
-			Actor->Destroy();
+			if (Actor) {
+				Actor->Destroy();
+			}
 		}
 		PreviewActors.Reset();
 	}
@@ -73,7 +75,7 @@ void ULODEditor::Collect()
 	}
 }
 
-void ULODEditor::ApplayAll()
+void ULODEditor::ApplyAll()
 {
 	TSet<UStaticMesh*> VisitedSet;
 	for (auto Actor : PreviewActors) {

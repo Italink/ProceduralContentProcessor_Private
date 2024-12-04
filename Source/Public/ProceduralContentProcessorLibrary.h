@@ -5,6 +5,7 @@
 #include "NiagaraSystem.h"
 #include "NiagaraEmitter.h"
 #include "Engine/TextureRenderTarget2D.h"
+#include "PhysicalMaterials/PhysicalMaterial.h"
 #include "ProceduralContentProcessorLibrary.generated.h"
 
 class ALandscape;
@@ -207,10 +208,19 @@ public:
 	static float GetLodDistance(UStaticMesh* InStaticMesh, int32 LODIndex);
 
 	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
-	static float ConvertDistanceToScreenSize(float ObjectSphereRadius, float Distance);
+	static float CalcLodDistance(float ObjectSphereRadius, float ScreenSize);
+
+	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
+	static float CalcScreenSize(float ObjectSphereRadius, float Distance);
+
+	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
+	static float CalcObjectSphereRadius(float ScreenSize, float Distance);
 
 	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
 	static UTexture2D* ConstructTexture2D(UTextureRenderTarget2D* TextureRenderTarget2D, UObject* Outer, FString Name, TextureCompressionSettings CompressionSettings = TC_Default);
+
+	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
+	static UTexture2D* ConstructTexture2DByRegion(UTextureRenderTarget2D* TextureRenderTarget2D, FBox2D Region , UObject* Outer, FString Name, TextureCompressionSettings CompressionSettings = TC_Default);
 
 	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
 	static void UpdateTexture2D(UTextureRenderTarget2D* TextureRenderTarget2D, UTexture2D* Texture);
@@ -223,6 +233,10 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
 	static bool DeprojectScreenToWorld(const FVector2D& InScreenPos, FVector& OutWorldOrigin, FVector& OutWorldDirection);
+
+	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
+	static UPhysicalMaterial* GetSimplePhysicalMaterial(UPrimitiveComponent* Component);
+
 
 	static TArray<TSharedPtr<FSlowTask>> SlowTasks;
 };

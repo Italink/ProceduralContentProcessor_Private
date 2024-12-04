@@ -40,6 +40,7 @@
 #include "ViewModels/Stack/NiagaraStackRoot.h"
 #include "SLevelViewport.h"
 #include "TextureCompiler.h"
+#include "ImageUtils.h"
 
 #define LOCTEXT_NAMESPACE "ProceduralContentProcessor"
 
@@ -509,15 +510,20 @@ float UProceduralContentProcessorLibrary::GetLodDistance(UStaticMesh* InStaticMe
 	if(LODIndex == 0)
 		return 0;
 	float ScreenSize = GetLodScreenSize(InStaticMesh, LODIndex);
+	return CalcLodDistance(InStaticMesh->GetBounds().SphereRadius, ScreenSize);
+}
+
+float UProceduralContentProcessorLibrary::CalcLodDistance(float ObjectSphereRadius, float ScreenSize)
+{
 	const float FOV = 90.0f;
 	const float FOVRad = FOV * (float)UE_PI / 360.0f;
 	const FMatrix ProjectionMatrix = FPerspectiveMatrix(FOVRad, 1920, 1080, 0.01f);
 	const float ScreenMultiple = FMath::Max(0.5f * ProjectionMatrix.M[0][0], 0.5f * ProjectionMatrix.M[1][1]);
 	const float ScreenRadius = FMath::Max(UE_SMALL_NUMBER, ScreenSize * 0.5f);
-	return ComputeBoundsDrawDistance(ScreenSize, InStaticMesh->GetBounds().SphereRadius, ProjectionMatrix);
+	return ComputeBoundsDrawDistance(ScreenSize, ObjectSphereRadius, ProjectionMatrix);
 }
 
-float UProceduralContentProcessorLibrary::ConvertDistanceToScreenSize(float ObjectSphereRadius, float Distance)
+float UProceduralContentProcessorLibrary::CalcScreenSize(float ObjectSphereRadius, float Distance)
 {
 	const float FOV = 90.0f;
 	const float FOVRad = FOV * (float)UE_PI / 360.0f;
@@ -527,6 +533,15 @@ float UProceduralContentProcessorLibrary::ConvertDistanceToScreenSize(float Obje
 		return 2.0f;
 	}
 	return  2.0f * ScreenMultiple * ObjectSphereRadius / FMath::Max(1.0f, Distance);
+}
+
+float UProceduralContentProcessorLibrary::CalcObjectSphereRadius(float ScreenSize, float Distance)
+{
+	const float FOV = 90.0f;
+	const float FOVRad = FOV * (float)UE_PI / 360.0f;
+	const FMatrix ProjectionMatrix = FPerspectiveMatrix(FOVRad, 1920, 1080, 0.01f);
+	const float ScreenMultiple = FMath::Max(0.5f * ProjectionMatrix.M[0][0], 0.5f * ProjectionMatrix.M[1][1]);
+	return ScreenSize * Distance / ( 2.0f* ScreenMultiple);
 }
 
 UTexture2D* UProceduralContentProcessorLibrary::ConstructTexture2D(UTextureRenderTarget2D* TextureRenderTarget2D, UObject* Outer, FString Name /*= NAME_None*/, TextureCompressionSettings CompressionSettings)
@@ -543,6 +558,21 @@ UTexture2D* UProceduralContentProcessorLibrary::ConstructTexture2D(UTextureRende
 	NewObj->PostEditChange();
 #endif
 	return NewObj;
+}
+
+UTexture2D* UProceduralContentProcessorLibrary::ConstructTexture2DByRegion(UTextureRenderTarget2D* TextureRenderTarget2D, FBox2D Region, UObject* Outer, FString Name, TextureCompressionSettings CompressionSettings /*= TC_Default*/)
+{
+	if (TextureRenderTarget2D == nullptr)
+		return nullptr;
+	ETextureRenderTargetFormat RenderTargetFormat = TextureRenderTarget2D->RenderTargetFormat;
+	FTextureRenderTargetResource* RenderTargetResource = TextureRenderTarget2D->GameThread_GetRenderTargetResource();
+	TArray<FColor> OutLDR;
+	FReadSurfaceDataFlags ReadPixelFlags(RCM_MinMax);
+	FIntRect IntRegion(Region.Min.IntPoint(), Region.Max.IntPoint());
+	RenderTargetResource->ReadPixels(OutLDR, ReadPixelFlags, IntRegion);
+	FCreateTexture2DParameters Params;
+	Params.CompressionSettings = CompressionSettings;
+	return FImageUtils::CreateTexture2D(IntRegion.Width(), IntRegion.Height(), OutLDR, Outer, Name, EObjectFlags::RF_NoFlags, Params);
 }
 
 void UProceduralContentProcessorLibrary::UpdateTexture2D(UTextureRenderTarget2D* TextureRenderTarget2D, UTexture2D* Texture)
@@ -669,6 +699,11 @@ bool UProceduralContentProcessorLibrary::DeprojectScreenToWorld(const FVector2D&
 		return true;
 	}
 	return false;
+}
+
+UPhysicalMaterial* UProceduralContentProcessorLibrary::GetSimplePhysicalMaterial(UPrimitiveComponent* Component)
+{
+	return Component->BodyInstance.GetSimplePhysicalMaterial();
 }
 
 TArray<TSharedPtr<FSlowTask>> UProceduralContentProcessorLibrary::SlowTasks;

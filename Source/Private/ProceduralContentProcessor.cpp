@@ -19,6 +19,7 @@
 #include "ProceduralMeshConversion.h"
 #include "StaticMeshCompiler.h"
 #include "Engine/TextureRenderTarget2D.h"
+#include "PropertyCustomizationHelpers.h"
 
 #if ENGINE_MAJOR_VERSION >=5 && ENGINE_MINOR_VERSION >= 4
 #include "GameFramework/ActorPrimitiveColorHandler.h"
@@ -68,6 +69,11 @@ TSharedPtr<SWidget> UProceduralContentProcessor::BuildWidget()
 	}));
 	DetailView->SetObject(this);
 	return DetailView;
+}
+
+TSharedPtr<SWidget> UProceduralContentProcessor::BuildToolBar()
+{
+	return SNullWidget::NullWidget;
 }
 
 TScriptInterface<IAssetRegistry> UProceduralAssetProcessor::GetAssetRegistry()
@@ -365,61 +371,71 @@ void UProceduralWorldProcessor::ActorSetRuntimeGrid(AActor* Actor, FName GridNam
 
 UWorld* UProceduralWorldProcessor::GetWorld() const
 {
+	if (GEditor && GEditor->PlayWorld != nullptr) {
+		return GEditor->PlayWorld;
+	}
 	return GEditor->GetEditorWorldContext().World();
 }
 
 void UProceduralActorColorationProcessor::Activate()
 {
 	Super::Activate();
-#if ENGINE_MAJOR_VERSION >=5 && ENGINE_MINOR_VERSION >= 4
-	auto GetColorFunc = [this](const UPrimitiveComponent* PrimitiveComponent){
-		return this->Colour(PrimitiveComponent);
-	};
-	FActorPrimitiveColorHandler::Get().RegisterPrimitiveColorHandler(*GetClass()->GetDisplayNameText().ToString(), GetClass()->GetDisplayNameText(), GetColorFunc);
-	FActorPrimitiveColorHandler::Get().SetActivePrimitiveColorHandler(*GetClass()->GetDisplayNameText().ToString(),GetWorld());
-
-	FLevelEditorModule& LevelEditor = FModuleManager::GetModuleChecked<FLevelEditorModule>("LevelEditor");
-	SLevelViewport* LevelViewport = LevelEditor.GetFirstActiveLevelViewport().Get();
-	FLevelEditorViewportClient& LevelViewportClient = LevelViewport->GetLevelViewportClient();
-	LevelViewportClient.EngineShowFlags.SetSingleFlag(FEngineShowFlags::SF_ActorColoration, true);
-	LevelViewportClient.Invalidate();
-#endif
-	//GEditor->OnLevelActorListChanged().AddUObject(this,&UProceduralActorColorationProcessor::OnLevelActorListChanged);
-	//GEditor->OnLevelActorAdded().AddUObject(this, &UProceduralActorColorationProcessor::OnLevelActorAdded);
-	//GEditor->OnLevelActorDeleted().AddUObject(this, &UProceduralActorColorationProcessor::OnLevelActorRemoved);
+	bVisible = true;
+	RefreshVisibility();
 }
 
 void UProceduralActorColorationProcessor::Deactivate()
 {
 	Super::Deactivate();
+	bVisible = false;
+	RefreshVisibility();
+}
+
+FReply UProceduralActorColorationProcessor::OnVisibilityClicked()
+{
+	bVisible = !bVisible;
+	RefreshVisibility();
+	return FReply::Handled();
+}
+
+void UProceduralActorColorationProcessor::RefreshVisibility()
+{
+	if (bVisible) {
 #if ENGINE_MAJOR_VERSION >=5 && ENGINE_MINOR_VERSION >= 4
-	FActorPrimitiveColorHandler::Get().UnregisterPrimitiveColorHandler(*GetClass()->GetDisplayNameText().ToString());
+		auto GetColorFunc = [this](const UPrimitiveComponent* PrimitiveComponent) {
+			return this->Colour(PrimitiveComponent);
+		};
+		FActorPrimitiveColorHandler::Get().RegisterPrimitiveColorHandler(*GetClass()->GetDisplayNameText().ToString(), GetClass()->GetDisplayNameText(), GetColorFunc);
+		FActorPrimitiveColorHandler::Get().SetActivePrimitiveColorHandler(*GetClass()->GetDisplayNameText().ToString(), GetWorld());
 
-	FLevelEditorModule& LevelEditor = FModuleManager::GetModuleChecked<FLevelEditorModule>("LevelEditor");
-	if (SLevelViewport* LevelViewport = LevelEditor.GetFirstActiveLevelViewport().Get()) {
+		FLevelEditorModule& LevelEditor = FModuleManager::GetModuleChecked<FLevelEditorModule>("LevelEditor");
+		SLevelViewport* LevelViewport = LevelEditor.GetFirstActiveLevelViewport().Get();
 		FLevelEditorViewportClient& LevelViewportClient = LevelViewport->GetLevelViewportClient();
-		LevelViewportClient.EngineShowFlags.SetSingleFlag(FEngineShowFlags::SF_ActorColoration, false);
+		LevelViewportClient.EngineShowFlags.SetSingleFlag(FEngineShowFlags::SF_ActorColoration, true);
 		LevelViewportClient.Invalidate();
-	}
 #endif
-	//GEditor->OnLevelActorListChanged().RemoveAll(this);
-	//GEngine->OnLevelActorAdded().RemoveAll(this);
-	//GEngine->OnLevelActorDeleted().RemoveAll(this);
+	}
+	else {
+#if ENGINE_MAJOR_VERSION >=5 && ENGINE_MINOR_VERSION >= 4
+		FActorPrimitiveColorHandler::Get().UnregisterPrimitiveColorHandler(*GetClass()->GetDisplayNameText().ToString());
+
+		FLevelEditorModule& LevelEditor = FModuleManager::GetModuleChecked<FLevelEditorModule>("LevelEditor");
+		if (SLevelViewport* LevelViewport = LevelEditor.GetFirstActiveLevelViewport().Get()) {
+			FLevelEditorViewportClient& LevelViewportClient = LevelViewport->GetLevelViewportClient();
+			LevelViewportClient.EngineShowFlags.SetSingleFlag(FEngineShowFlags::SF_ActorColoration, false);
+			LevelViewportClient.Invalidate();
+		}
+#endif
+	}
 }
 
-void UProceduralActorColorationProcessor::OnLevelActorListChanged()
+TSharedPtr<SWidget> UProceduralActorColorationProcessor::BuildToolBar()
 {
-	//FActorPrimitiveColorHandler::Get().RefreshPrimitiveColorHandler(*GetClass()->GetDisplayNameText().ToString(), GetWorld());
-}
-
-void UProceduralActorColorationProcessor::OnLevelActorAdded(AActor* InActor)
-{
-	//FActorPrimitiveColorHandler::Get().RefreshPrimitiveColorHandler(*GetClass()->GetDisplayNameText().ToString(), GetWorld());
-}
-
-void UProceduralActorColorationProcessor::OnLevelActorRemoved(AActor* InActor)
-{
-	//FActorPrimitiveColorHandler::Get().RefreshPrimitiveColorHandler(*GetClass()->GetDisplayNameText().ToString(), GetWorld());
+	return PropertyCustomizationHelpers::MakeVisibilityButton(
+		FOnClicked::CreateUObject(this, &UProceduralActorColorationProcessor::OnVisibilityClicked),
+		FText(),
+		TAttribute<bool>::CreateLambda([this]() { return bVisible; })
+	).ToSharedPtr();
 }
 
 FLinearColor UProceduralActorColorationProcessor::Colour_Implementation(const UPrimitiveComponent* PrimitiveComponent)

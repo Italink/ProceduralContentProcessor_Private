@@ -94,8 +94,7 @@ public:
 	void Collect();
 
 	UFUNCTION(CallInEditor)
-	void ApplayAll();
-
+	void ApplyAll();
 
 	UFUNCTION(BlueprintCallable, CallInEditor)
 	void GenerateLODForSelectedStaticMesh();

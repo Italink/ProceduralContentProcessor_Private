@@ -67,11 +67,20 @@ void SProceduralContentProcessorEditorOutliner::Construct(const FArguments& InAr
 					FText()
 				)
 			]
+			+ SHorizontalBox::Slot()
+				.AutoWidth()
+				.Padding(2)
+				.HAlign(HAlign_Right)
+				.VAlign(VAlign_Center)
+				[
+					SAssignNew(ProcessorToolBarContainter, SBox)
+
+				]
 		]
 		+ SVerticalBox::Slot()
 		.Padding(5)
 		[
-			SAssignNew(ProcessorWidgetContainter,SBox)
+			SAssignNew(ProcessorWidgetContainter, SBox)
 		]
 	];
 
@@ -216,6 +225,7 @@ void SProceduralContentProcessorEditorOutliner::SetCurrentProcessor(UClass* InPr
 		CurrentProcessor->LoadConfig();
 		CurrentProcessor->Activate();
 		ProcessorWidgetContainter->SetContent(CurrentProcessor->BuildWidget().ToSharedRef());
+		ProcessorToolBarContainter->SetContent(CurrentProcessor->BuildToolBar().ToSharedRef());
 		CurrentProcessorText = InProcessorClass->GetDisplayNameText();
 		FString DocumentHyperlink;
 		if (UProceduralContentProcessorBlueprint* Blueprint = Cast<UProceduralContentProcessorBlueprint>(InProcessorClass->ClassGeneratedBy)){
@@ -236,6 +246,7 @@ void SProceduralContentProcessorEditorOutliner::SetCurrentProcessor(UClass* InPr
 		CurrentProcessorText = FText();
 		ProcessorDocumentationContainter->SetContent(SNullWidget::NullWidget);
 		ProcessorWidgetContainter->SetContent(SNullWidget::NullWidget);
+		ProcessorToolBarContainter->SetContent(SNullWidget::NullWidget);
 	}
 }
 

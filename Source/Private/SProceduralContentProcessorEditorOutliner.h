@@ -86,6 +86,8 @@ private:
 
 	TSharedPtr<SBox> ProcessorDocumentationContainter;
 	TSharedPtr<SBox> ProcessorWidgetContainter;
+	TSharedPtr<SBox> ProcessorToolBarContainter;
 
 	bool bNeedRefreshProcessorList = false;
+
 };

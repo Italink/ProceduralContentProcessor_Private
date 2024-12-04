@@ -67,7 +67,8 @@ public class ProceduralContentProcessor : ModuleRules
                 "ShaderFormatVectorVM",
                 "Niagara",
                 "NiagaraEditor",
-                "MaterialEditor"
+                "MaterialEditor",
+                "PhysicsCore"
 				// ... add private dependencies that you statically link with here ...	
 			}
 			);
