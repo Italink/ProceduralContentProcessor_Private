@@ -193,6 +193,9 @@ public:
 	static bool MatchString(FString InString,const TArray<FString>& IncludeList, const TArray<FString>& ExcludeList);
 
 	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
+	static float GetStaticMeshDiskSize(UStaticMesh* StaticMesh, bool bWithTexture = true);
+
+	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
 	static UStaticMesh* GetComplexCollisionMesh(UStaticMesh* InMesh);
 
 	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")

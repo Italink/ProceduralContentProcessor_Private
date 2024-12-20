@@ -372,6 +372,30 @@ bool UProceduralContentProcessorLibrary::MatchString(FString InString, const TAr
 	return false;
 }
 
+float UProceduralContentProcessorLibrary::GetStaticMeshDiskSize(UStaticMesh* StaticMesh, bool bWithTexture)
+{
+	float DiskSize = 0.0f;
+	if (StaticMesh) {
+		if (StaticMesh->GetRenderData()) {
+			DiskSize = StaticMesh->NaniteSettings.bEnabled ? StaticMesh->GetRenderData()->EstimatedNaniteTotalCompressedSize : StaticMesh->GetRenderData()->EstimatedCompressedSize;
+		}
+		if (bWithTexture) {
+			TSet<UObject*> ReferencedAssets;
+			FFindReferencedAssets::BuildAssetList(StaticMesh, {}, {}, ReferencedAssets, false);
+			for (auto Asset : ReferencedAssets) {
+				if (UTexture* Texture = Cast<UTexture>(Asset)) {
+					const FStreamableRenderResourceState SRRState = Texture->GetStreamableResourceState();
+					const int32 ActualMipBias = SRRState.IsValid() ? (SRRState.ResidentFirstLODIdx() + SRRState.AssetLODBias) : Texture->GetCachedLODBias();
+					FTexturePlatformData** PlatformDataPtr = Texture->GetRunningPlatformData();
+					const int64 ResourceSize = PlatformDataPtr && *PlatformDataPtr ? (*PlatformDataPtr)->GetPayloadSize(ActualMipBias) : Texture->GetResourceSizeBytes(EResourceSizeMode::Exclusive);
+					DiskSize += ResourceSize;
+				}
+			}
+		}
+	}
+	return DiskSize / 1048576.0f;
+}
+
 bool UProceduralContentProcessorLibrary::IsGeneratedByBlueprint(UObject* InObject)
 {
 	return InObject&& InObject->GetClass()&&Cast<UBlueprint>(InObject->GetClass()->ClassGeneratedBy);

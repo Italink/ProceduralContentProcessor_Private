@@ -255,7 +255,7 @@ AStaticMeshActor* UCollisionProxyGenerateMethod_Proxy::Generate(TArray<UStaticMe
 		}
 		ProxyedStaticMesh->CreateBodySetup();
 	}
-	ProxyedStaticMesh->ClearFlags(RF_Public);
+	ProxyedStaticMesh->ClearFlags(RF_Public | RF_Standalone);
 	StaticMeshActor->GetStaticMeshComponent()->SetStaticMesh(ProxyedStaticMesh);
 	FTransform Transform;
 	Transform.SetLocation(MergedLocation);
