@@ -133,7 +133,7 @@ void UFrameAnimCaptureTool::Tick(const float InDeltaTime)
 			int TargetFrame = (GFrameCounterRenderThread - BeginFrameCounter) / FrameStep;
 			if(CurrentFrameIndex != TargetFrame)
 				return;
-			if (CurrentFrameIndex < FrameCount) {
+			if (CurrentFrameIndex < FrameCount && CaptureActor) {
 				USceneCaptureComponent2D* SceneCaptureComp = CaptureActor->GetCaptureComponent2D();
 				SceneCaptureComp->CaptureScene();
 				FIntPoint BlockOffset;
