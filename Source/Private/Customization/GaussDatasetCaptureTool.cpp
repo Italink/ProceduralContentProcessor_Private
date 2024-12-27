@@ -18,7 +18,6 @@
 #include "Widgets/Input/SComboBox.h"
 #include "Widgets/Notifications/SNotificationList.h"
 #include "Framework/Notifications/NotificationManager.h"
-#include "ImageWriteBlueprintLibrary.h"
 
 void UGaussDatasetCaptureTool::Activate()
 {
@@ -26,7 +25,7 @@ void UGaussDatasetCaptureTool::Activate()
 	if (!CaptureRT) {
 		CaptureRT = NewObject<UTextureRenderTarget2D>();
 		CaptureRT->RenderTargetFormat = ETextureRenderTargetFormat::RTF_RGBA8;
-		CaptureRT->InitAutoFormat(2048, 2048);
+		CaptureRT->InitAutoFormat(1024, 1024);
 		CaptureRT->UpdateResourceImmediate(true);
 	}
 	if (!CaptureActor) {
@@ -43,11 +42,12 @@ void UGaussDatasetCaptureTool::Activate()
 			CaptureActor->SetFlags(RF_Transient);
 		}
 		USceneCaptureComponent2D* SceneCaptureComp = CaptureActor->GetCaptureComponent2D();
+		//SceneCaptureComp->ProjectionType = ECameraProjectionMode::Orthographic;
 		SceneCaptureComp->bCaptureEveryFrame = false;
 		SceneCaptureComp->bCaptureOnMovement = false;
 		SceneCaptureComp->TextureTarget = CaptureRT;
 		SceneCaptureComp->PrimitiveRenderMode = ESceneCapturePrimitiveRenderMode::PRM_UseShowOnlyList;
-		//SceneCaptureComp->ShowFlagSettings.Add(FEngineShowFlagsSetting{ TEXT("Lighting"), false });
+		SceneCaptureComp->ShowFlagSettings.Add(FEngineShowFlagsSetting{ TEXT("Lighting"), false });
 		SceneCaptureComp->ShowFlagSettings.Add(FEngineShowFlagsSetting{ TEXT("Atmosphere"), false });
 		//SceneCaptureComp->ShowFlagSettings.Add(FEngineShowFlagsSetting{ TEXT("Bloom"), false });
 		SceneCaptureComp->ShowFlagSettings.Add(FEngineShowFlagsSetting{ TEXT("Fog"), false });
@@ -88,28 +88,67 @@ void UGaussDatasetCaptureTool::Tick(const float InDeltaTime)
 	UWorld* World = GetWorld();
 }
 
+FVector UVtoPyramid(FVector2D UV) {
+	FVector Position = FVector(
+		0.0f + (UV.X - UV.Y),
+		-1.0f + (UV.X + UV.Y),
+		0.0f
+	);
+
+	FVector2D Absolute = FVector2D(Position).GetAbs();
+	Position.Z = 1.0f - Absolute.X - Absolute.Y;
+	return Position;
+}
+
+FVector UVtoOctahedron(FVector2D uv) {
+	FVector Position = FVector(2.0f * (uv - 0.5f), 0);
+
+	FVector2D Absolute = FVector2D(Position).GetAbs();
+	Position.Z = 1.0f - Absolute.X - Absolute.Y;
+
+	// "Tuck in" the corners by reflecting the xy position along the line y = 1 - x
+	// (in quadrant 1), and its mirrored image in the other quadrants.
+	if (Position.Z < 0) {
+		FVector2D Temp = FMath::Sign(FVector2D(Position))* FVector2D(1.0f - Absolute.X, 1.0f - Absolute.Y);
+		Position.X = Temp.X;
+		Position.Y = Temp.Y;
+	}
+
+	return Position;
+}
+
 void UGaussDatasetCaptureTool::Capture()
 {
+	float Radius = FMath::Max<FVector::FReal>(CurrentBounds.BoxExtent.Size(), 10.f);
 	USceneCaptureComponent2D* SceneCaptureComp = CaptureActor->GetCaptureComponent2D();
-	SceneCaptureComp->CaptureScene();
-	TArray<FColor> FullColors;
-	ETextureRenderTargetFormat RenderTargetFormat = CaptureRT->RenderTargetFormat;
-	FTextureRenderTargetResource* RenderTargetResource = CaptureRT->GameThread_GetRenderTargetResource();
-	FReadSurfaceDataFlags ReadPixelFlags(RCM_MinMax);
-	FIntRect IntRegion(0, 0, CaptureRT->SizeX, CaptureRT->SizeY);
-	RenderTargetResource->ReadPixels(FullColors, ReadPixelFlags, IntRegion);
-	FImageView ImageView(FullColors.GetData(), CaptureRT->SizeX, CaptureRT->SizeY);
-	FImageUtils::SaveImageByExtension(TEXT("F:/gaussian-splatting/dataset_ue/Images/test.png"), ImageView);
+	const float HalfFOVRadians = FMath::DegreesToRadians(SceneCaptureComp->FOVAngle / 2.0f);
+	const float DistanceFromSphere = Radius / FMath::Tan(HalfFOVRadians) * 2;
+	for (int i = 0; i < FrameXY; i++) {
+		for (int j = 0; j < FrameXY; j++) {
+			int FrameIndex = j * FrameXY + i;
+			FVector Direction = UVtoPyramid(FVector2D(i / (double)FrameXY, j / (double)FrameXY));
+			FVector Position = CurrentBounds.Origin + Direction * DistanceFromSphere;
+			FRotator Rotator = UKismetMathLibrary::FindLookAtRotation(Position, CurrentBounds.Origin);
+			CaptureActor->SetActorLocationAndRotation(Position, Rotator);
+			SceneCaptureComp->CaptureScene();
+			TArray<FColor> FullColors;
+			ETextureRenderTargetFormat RenderTargetFormat = CaptureRT->RenderTargetFormat;
+			FTextureRenderTargetResource* RenderTargetResource = CaptureRT->GameThread_GetRenderTargetResource();
+			FReadSurfaceDataFlags ReadPixelFlags(RCM_MinMax);
+			FIntRect IntRegion(0, 0, CaptureRT->SizeX, CaptureRT->SizeY);
+			RenderTargetResource->ReadPixels(FullColors, ReadPixelFlags, IntRegion);
+			for (auto& Color : FullColors) {
+				Color.A = 255 - Color.A;
+			}
+			FImageView ImageView(FullColors.GetData(), CaptureRT->SizeX, CaptureRT->SizeY, EGammaSpace::Linear);
+			FImageUtils::SaveImageByExtension(*FString::Printf(TEXT("F:/gaussian-splatting/dataset_ue/Images/%4d.png"),FrameIndex), ImageView);
+		}
+	}
 }
 
 void UGaussDatasetCaptureTool::CreateAsset()
 {
-	FImageWriteOptions WriteOptions;
-	WriteOptions.Format = EDesiredImageFormat::PNG;
-	WriteOptions.bOverwriteFile = true;
-	WriteOptions.bAsync = false;
-	WriteOptions.CompressionQuality = 100.0f;
-	UImageWriteBlueprintLibrary::ExportToDisk(FrameTexture, "F:/gaussian-splatting/dataset_ue/Images/test.png", WriteOptions);
+
 	//if (!FrameTexture) {
 	//	return;
 	//}
@@ -167,6 +206,8 @@ void UGaussDatasetCaptureTool::OnActorSelectionChanged(const TArray<UObject*>& N
 	FBoxSphereBounds Bounds;
 	Bounds.SphereRadius = 0;
 	for (const auto& Actor : SourceActors) {
+		if(Actor->Tags.Contains("GaussDatasetCaptureCamera"))
+			continue;
 		for (auto Comp : Actor->GetComponents()) {
 			if (auto PrimitiveComponent = Cast<UPrimitiveComponent>(Comp)) {
 				if (Bounds.SphereRadius <= 0) {
@@ -178,9 +219,40 @@ void UGaussDatasetCaptureTool::OnActorSelectionChanged(const TArray<UObject*>& N
 			}
 		}
 	}
-	//CurrentBounds = Bounds;
+	if(Bounds.SphereRadius == 0)
+		return;
+	CurrentBounds = Bounds;
 	if (CaptureActor) {
 		USceneCaptureComponent2D* SceneCaptureComp = CaptureActor->GetCaptureComponent2D();
 		SceneCaptureComp->ShowOnlyActors = SourceActors;
+	}
+	UpdateCameraMatrix();
+}
+
+void UGaussDatasetCaptureTool::UpdateCameraMatrix()
+{
+	UWorld* World = GetWorld();
+	UStaticMesh* CameraMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/EditorMeshes/MatineeCam_SM.MatineeCam_SM"));
+	TArray<AActor*> LastActors;
+	UGameplayStatics::GetAllActorsOfClassWithTag(World, AStaticMeshActor::StaticClass(), "GaussDatasetCaptureCamera" , LastActors);
+	for (auto Actor : LastActors) {
+		Actor->Destroy();
+	}
+	float Radius = FMath::Max<FVector::FReal>(CurrentBounds.BoxExtent.Size(), 10.f);
+	USceneCaptureComponent2D* SceneCaptureComp = CaptureActor->GetCaptureComponent2D();
+	const float HalfFOVRadians = FMath::DegreesToRadians(SceneCaptureComp->FOVAngle / 2.0f);
+	const float DistanceFromSphere = Radius / FMath::Tan(HalfFOVRadians) * 2;
+	for (int i = 0; i < FrameXY; i++) {
+		for (int j = 0; j < FrameXY; j++) {
+			FVector Direction = UVtoPyramid(FVector2D(i / (double)FrameXY, j / (double)FrameXY));
+			Direction.Normalize();
+			FVector Position = CurrentBounds.Origin + Direction * DistanceFromSphere;
+			FRotator Rotator = UKismetMathLibrary::FindLookAtRotation(Position, CurrentBounds.Origin);
+			AStaticMeshActor* MeshActor = World->SpawnActor<AStaticMeshActor>();
+			MeshActor->SetActorLocationAndRotation(Position, Rotator);
+			MeshActor->SetFlags(EObjectFlags::RF_Transient);
+			MeshActor->Tags.Add("GaussDatasetCaptureCamera");
+			MeshActor->GetStaticMeshComponent()->SetStaticMesh(CameraMesh);
+		}
 	}
 }

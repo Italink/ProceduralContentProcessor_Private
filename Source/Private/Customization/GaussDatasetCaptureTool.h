@@ -23,6 +23,8 @@ private:
 	void CreateAsset();
 
 	void OnActorSelectionChanged(const TArray<UObject*>& NewSelection, bool bForceRefresh);
+
+	void UpdateCameraMatrix();
 private:
 	UPROPERTY(EditAnywhere)
 	TArray<TObjectPtr<AActor>> SourceActors;
@@ -33,23 +35,16 @@ private:
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<UTextureRenderTarget2D> CaptureRT;
 
-	UPROPERTY(EditAnywhere, meta = (UIMin = 0.01, ClampMin = 0.01, UIMax = 2, ClampMax = 2))
-	float BoundsScaleFactor = 1.0f;
-
 	UPROPERTY(EditAnywhere, Config)
-	int FrameCount = 32;
-
-	UPROPERTY(EditAnywhere, Config)
-	int FrameStep = 1;
-
-	UPROPERTY(EditAnywhere, Config)
-	bool bPaddingToPowerOfTwo = true;
+	int FrameXY = 16;
 
 	UPROPERTY(VisibleAnywhere)
-	TObjectPtr<UTexture2D> FrameTexture;
+	TArray<TObjectPtr<UTexture2D>> Frames;
 
 	UPROPERTY(Config)
 	FString LastSavePath;
 
 	FDelegateHandle OnActorSelectionChangedHandle;
+
+	FBoxSphereBounds CurrentBounds;
 };

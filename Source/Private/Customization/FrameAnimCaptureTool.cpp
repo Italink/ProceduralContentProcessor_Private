@@ -18,7 +18,7 @@
 #include "Widgets/Input/SComboBox.h"
 #include "Widgets/Notifications/SNotificationList.h"
 #include "Framework/Notifications/NotificationManager.h"
-#include "../../../../../../../Source/Runtime/AssetRegistry/Public/AssetRegistry/AssetRegistryModule.h"
+#include "AssetRegistry/AssetRegistryModule.h"
 
 void UFrameAnimCaptureTool::Activate()
 {
