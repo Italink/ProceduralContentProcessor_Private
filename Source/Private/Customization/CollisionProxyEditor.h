@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ProceduralContentProcessor.h"
+#include "MeshMerge/MeshApproximationSettings.h"
 #include "CollisionProxyEditor.generated.h"
 
 UENUM()

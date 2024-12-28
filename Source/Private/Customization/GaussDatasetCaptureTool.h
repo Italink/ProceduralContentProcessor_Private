@@ -6,7 +6,7 @@
 #include "Engine/TextureRenderTarget2D.h"
 #include "GaussDatasetCaptureTool.generated.h"
 
-UCLASS(EditInlineNew, CollapseCategories, config = ProceduralContentProcessor, defaultconfig, Category = "Model", meta = (DisplayName = "Frame Animation Capture Tool"))
+UCLASS(EditInlineNew, CollapseCategories, config = ProceduralContentProcessor, defaultconfig, Category = "Model", meta = (DisplayName = "Gauss Dataset Capture Tool"))
 class PROCEDURALCONTENTPROCESSOR_API UGaussDatasetCaptureTool: public UProceduralWorldProcessor {
 	GENERATED_BODY()
 private:
@@ -16,33 +16,38 @@ private:
 
 	virtual void Tick(const float InDeltaTime) override;
 
-	UFUNCTION(CallInEditor)
+	UFUNCTION(CallInEditor, Category = "Step0-GenerateDatabase")
 	void Capture();
 
-	UFUNCTION(CallInEditor)
-	void CreateAsset();
+	UFUNCTION(CallInEditor, Category = "Step0-GenerateDatabase")
+	void BrowseToDatabase();
 
+	UFUNCTION(CallInEditor, Category = "Step1-ReconstructSparseModel")
+	void ReconstructSparseModel();
+	
 	void OnActorSelectionChanged(const TArray<UObject*>& NewSelection, bool bForceRefresh);
 
 	void UpdateCameraMatrix();
+
+#if WITH_EDITOR
+	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
+#endif
+
 private:
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere, Category = "Step0-GenerateDatabase")
 	TArray<TObjectPtr<AActor>> SourceActors;
 
-	UPROPERTY(VisibleAnywhere)
+	UPROPERTY(VisibleAnywhere, Category = "Step0-GenerateDatabase")
 	TObjectPtr<ASceneCapture2D> CaptureActor;
 
-	UPROPERTY(VisibleAnywhere)
+	UPROPERTY(VisibleAnywhere, Category = "Step0-GenerateDatabase")
 	TObjectPtr<UTextureRenderTarget2D> CaptureRT;
 
-	UPROPERTY(EditAnywhere, Config)
+	UPROPERTY(EditAnywhere, Config, Category = "Step0-GenerateDatabase")
 	int FrameXY = 16;
 
-	UPROPERTY(VisibleAnywhere)
-	TArray<TObjectPtr<UTexture2D>> Frames;
-
-	UPROPERTY(Config)
-	FString LastSavePath;
+	UPROPERTY(EditAnywhere, Config, Category = "Step0-GenerateDatabase", meta = (UIMin = 0.01, ClampMin = 0.01, UIMax = 2, ClampMax = 2))
+	float CaptureDistanceScale = 1.0f;
 
 	FDelegateHandle OnActorSelectionChangedHandle;
 
