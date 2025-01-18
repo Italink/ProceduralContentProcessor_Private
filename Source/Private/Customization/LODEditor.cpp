@@ -23,7 +23,7 @@ ULODEditor::ULODEditor()
 
 }
 
-void ULODEditor::SpawnStaticMeshPreview()
+void ULODEditor::RefreshPreviewMatrix()
 {
 	if (!PreviewActors.IsEmpty()) {
 		for (auto Actor : PreviewActors) {
@@ -85,13 +85,13 @@ void ULODEditor::ApplyAll()
 				VisitedSet.Add(StaticMesh);
 				UProceduralContentProcessorLibrary::SetNaniteMeshEnabled(StaticMeshActor->GetStaticMeshComponent()->GetStaticMesh(), false);
 				SelectedStaticMeshActor = StaticMeshActor;
-				GenerateLODForSelectedStaticMesh();
+				GenerateLODForSelected();
 			}
 		}
 	}
 }
 
-void ULODEditor::GenerateLODForSelectedStaticMesh()
+void ULODEditor::GenerateLODForSelected()
 {
 	if (SelectedStaticMeshActor == nullptr)
 			return;

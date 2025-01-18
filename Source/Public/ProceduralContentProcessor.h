@@ -5,7 +5,6 @@
 #include "Blueprint/UserWidget.h"
 #include "ProceduralContentProcessor.generated.h"
 
-
 UENUM(BlueprintType, meta = (Bitflags, UseEnumValuesAsMaskValuesInEditor = "true"))
 enum EObjectPropertyChangeType : uint64
 {

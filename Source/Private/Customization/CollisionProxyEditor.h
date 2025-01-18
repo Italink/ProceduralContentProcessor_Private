@@ -1,7 +1,13 @@
 #pragma once
 
 #include "ProceduralContentProcessor.h"
+#include "Misc/EngineVersionComparison.h"
+
+#if UE_VERSION_NEWER_THAN(5, 5, 0)
 #include "MeshMerge/MeshApproximationSettings.h"
+#else
+#include "Engine/MeshMerging.h"
+#endif
 #include "CollisionProxyEditor.generated.h"
 
 UENUM()

@@ -90,17 +90,17 @@ public:
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<AActor>> PreviewActors;
 
-	UFUNCTION(CallInEditor)
+	//UFUNCTION(CallInEditor)
 	void Collect();
 
-	UFUNCTION(CallInEditor)
+	//UFUNCTION(CallInEditor)
 	void ApplyAll();
 
 	UFUNCTION(BlueprintCallable, CallInEditor)
-	void GenerateLODForSelectedStaticMesh();
+	void GenerateLODForSelected();
 
 	UFUNCTION(BlueprintCallable, CallInEditor)
-	void SpawnStaticMeshPreview();
+	void RefreshPreviewMatrix();
 
 	virtual void Activate() override;
 	virtual void Deactivate() override;
