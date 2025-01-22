@@ -23,71 +23,80 @@ ULODEditor::ULODEditor()
 
 }
 
+void ULODEditor::Activate()
+{
+	FLevelEditorModule& LevelEditor = FModuleManager::GetModuleChecked<FLevelEditorModule>("LevelEditor");
+	OnActorSelectionChangedHandle = LevelEditor.OnActorSelectionChanged().AddUObject(this, &ULODEditor::OnActorSelectionChanged);
+	TArray<UObject*> Objects;
+	GEditor->GetSelectedActors()->GetSelectedObjects(Objects);
+	OnActorSelectionChanged(Objects, true);
+	StaticMeshes.Reset();
+	for (auto MeshPath : StaticMeshesForConfig) {
+		StaticMeshes.AddUnique(Cast<UStaticMesh>(MeshPath.TryLoad()));
+	}
+}
+
+void ULODEditor::Deactivate()
+{
+	if (OnActorSelectionChangedHandle.IsValid()) {
+		FLevelEditorModule& LevelEditor = FModuleManager::GetModuleChecked<FLevelEditorModule>("LevelEditor");
+		LevelEditor.OnActorSelectionChanged().Remove(OnActorSelectionChangedHandle);
+		OnActorSelectionChangedHandle.Reset();
+	}
+	StaticMeshesForConfig.Reset();
+	for (auto Mesh : StaticMeshes) {
+		StaticMeshesForConfig.AddUnique(Mesh);
+	}
+	TryUpdateDefaultConfigFile();
+}
+
+
 void ULODEditor::RefreshPreviewMatrix()
 {
-	if (!PreviewActors.IsEmpty()) {
-		for (auto Actor : PreviewActors) {
-			if (Actor) {
-				Actor->Destroy();
-			}
-		}
-		PreviewActors.Reset();
-	}
 	UWorld* World = GetWorld();
-	float XOffset = 0;
+	TArray<AActor*> OutActors; 
+	UGameplayStatics::GetAllActorsOfClass(World, AActor::StaticClass(), OutActors);
+	for (auto Actor : OutActors) {
+		if (Actor && (Actor->Tags.Contains("LODPreviewActor") || Actor->Tags.Contains("LODPreviewTextActor"))) {
+			Actor->Destroy();
+		}
+	}
+
+	float YOffset = 0;
+	TArray<AStaticMeshActor*> MeshActor;
 	for (auto StaticMesh : StaticMeshes) {
 		const FBoxSphereBounds& Bound = StaticMesh->GetBounds();
 		for (int Y = 0; Y < StaticMesh->GetNumLODs(); Y++) {
 			float ScreenSize = UProceduralContentProcessorLibrary::GetLodScreenSize(StaticMesh, Y);
-			float YOffset = UProceduralContentProcessorLibrary::GetLodDistance(StaticMesh, Y);
-			AStaticMeshActor* PreviewActor = World->SpawnActor<AStaticMeshActor>(FVector(XOffset, YOffset, Bound.BoxExtent.Z), FRotator());
+			float XOffset = UProceduralContentProcessorLibrary::GetLodDistance(StaticMesh, Y);
+			AStaticMeshActor* PreviewActor = World->SpawnActor<AStaticMeshActor>(FVector(XOffset, YOffset, 0), FRotator(0, 0, 0));
 			PreviewActor->GetStaticMeshComponent()->SetStaticMesh(StaticMesh);
 			PreviewActor->GetStaticMeshComponent()->ForcedLodModel = Y + 1;
-
-			PreviewActor->SetFlags(RF_Transient);
 			PreviewActor->SetActorLabel(FString::Printf(TEXT("LODPreviewActor[%s]:LOD%d"), *StaticMesh->GetName(), Y));
-			ATextRenderActor* TextActor = World->SpawnActor<ATextRenderActor>(FVector(XOffset, YOffset, Bound.SphereRadius * 2 + 100.0f), FRotator(0, -90.0f, 0));
-			TextActor->SetFlags(RF_Transient);
-			TextActor->AttachToActor(PreviewActor, FAttachmentTransformRules::KeepWorldTransform);
-			TextActor->GetTextRender()->SetText(FText::FromString(FString::Printf(TEXT("LOD%d\nScreen Size:%f\nDistance:%d\nVertices:%d\nTriangles:%d"), Y, ScreenSize, (int)YOffset, StaticMesh->GetNumVertices(Y), StaticMesh->GetNumTriangles(Y))));
+			PreviewActor->Tags.Add("LODPreviewActor");
+			ATextRenderActor* TextActor = World->SpawnActor<ATextRenderActor>();
+			TextActor->AttachToActor(PreviewActor, FAttachmentTransformRules::SnapToTargetIncludingScale);
+			TextActor->SetActorRelativeLocation(FVector(0, 0, Bound.SphereRadius * 2 + 100));
+			TextActor->SetActorRelativeRotation(FRotator(0, 180.0f, 0));
+			TextActor->GetTextRender()->SetText(FText::FromString(
+				FString::Printf(TEXT("LOD%d\nScreen Size:%f\nDistance:%d\nBound Sphere Radius:%d\nVertices:%d\nTriangles:%d")
+					, Y
+					, ScreenSize
+					, (int)XOffset
+					, (int)StaticMesh->GetBounds().SphereRadius
+					, StaticMesh->GetNumVertices(Y)
+					, StaticMesh->GetNumTriangles(Y))
+			));
 			TextActor->GetTextRender()->SetHorizontalAlignment(EHTA_Center);
-			PreviewActors.Add(PreviewActor);
-			PreviewActors.Add(TextActor);
+			TextActor->GetTextRender()->SetWorldSize(100);
+			TextActor->Tags.Add("LODPreviewTextActor");
+			MeshActor.Add(PreviewActor);
 		}
-		XOffset += Bound.SphereRadius * 2 + 200.0f;
+		YOffset += FMath::Max(Bound.SphereRadius * 2 + 200.0f, 1500.0f);
 	}
-}
-
-void ULODEditor::Collect()
-{
-	UWorld* World = GetWorld();
-	TArray<AActor*> Actors;
-	UGameplayStatics::GetAllActorsOfClass(World, AActor::StaticClass(), Actors);
-	for (auto Actor : Actors) {
-		for (auto Comp : Actor->GetComponents()) {
-			if (auto StaticMeshComp = Cast<UStaticMeshComponent>(Comp)) {
-				UStaticMesh* StaitcMesh = StaticMeshComp->GetStaticMesh();
-				if (StaitcMesh->GetPathName().Contains("EuropeanHor")) {
-					StaticMeshes.AddUnique(StaitcMesh);
-				}
-			}
-		}
-	}
-}
-
-void ULODEditor::ApplyAll()
-{
-	TSet<UStaticMesh*> VisitedSet;
-	for (auto Actor : PreviewActors) {
-		if (auto StaticMeshActor = Cast<AStaticMeshActor>(Actor)) {
-			UStaticMesh* StaticMesh = StaticMeshActor->GetStaticMeshComponent()->GetStaticMesh();
-			if (!VisitedSet.Contains(StaticMesh)) {
-				VisitedSet.Add(StaticMesh);
-				UProceduralContentProcessorLibrary::SetNaniteMeshEnabled(StaticMeshActor->GetStaticMeshComponent()->GetStaticMesh(), false);
-				SelectedStaticMeshActor = StaticMeshActor;
-				GenerateLODForSelected();
-			}
-		}
+	YOffset /= 2;
+	for (auto Actor : MeshActor) {
+		Actor->SetActorLocation(Actor->GetActorLocation() + FVector(10000, -YOffset, 0));
 	}
 }
 
@@ -130,7 +139,6 @@ void ULODEditor::GenerateLODForSelected()
 		
 	int32 LODIndex = 1;
 	for (; LODIndex < SelectedStaticMeshLODChain.Num(); ++LODIndex) {
-		FStaticMeshSourceModel& SrcModel = StaticMesh->AddSourceModel();
 		const FStaticMeshChainNode& ChainNode = SelectedStaticMeshLODChain[LODIndex];
 		float ScreenSize = SelectedStaticMeshLODChain[LODIndex].ScreenSize;
 		if (SelectedStaticMeshLODChain[LODIndex].bUseDistance) {
@@ -142,6 +150,7 @@ void ULODEditor::GenerateLODForSelected()
 			}
 		}
 		if (ChainNode.Type == EStaticMeshLODGenerateType::Reduce) {
+			FStaticMeshSourceModel& SrcModel = StaticMesh->AddSourceModel();
 			SrcModel.BuildSettings = SelectedStaticMeshLODChain[LODIndex].BuildSettings;
 			SrcModel.ReductionSettings = SelectedStaticMeshLODChain[LODIndex].ReductionSettings;
 			SrcModel.ScreenSize = ScreenSize;
@@ -184,31 +193,79 @@ void ULODEditor::GenerateLODForSelected()
 	}
 }
 
-void ULODEditor::Activate()
+void ULODEditor::GenerateLODForAllByAuto()
 {
-	FLevelEditorModule& LevelEditor = FModuleManager::GetModuleChecked<FLevelEditorModule>("LevelEditor");
-	OnActorSelectionChangedHandle = LevelEditor.OnActorSelectionChanged().AddUObject(this, &ULODEditor::OnActorSelectionChanged);
-	TArray<UObject*> Objects;
-	GEditor->GetSelectedActors()->GetSelectedObjects(Objects);
-	OnActorSelectionChanged(Objects, true);
-	StaticMeshes.Reset();
-	for (auto MeshPath : StaticMeshesForConfig) {
-		StaticMeshes.AddUnique(Cast<UStaticMesh>(MeshPath.TryLoad()));
+	UWorld* World = GetWorld();
+	TArray<AActor*> OutActors;
+	TArray<AStaticMeshActor*> MeshActors;
+	UGameplayStatics::GetAllActorsOfClass(World, AActor::StaticClass(), OutActors);
+
+	for (auto Actor : OutActors) {
+		if (Actor && Actor->Tags.Contains("LODPreviewActor")) {
+			if (auto StaticMeshActor = Cast<AStaticMeshActor>(Actor)) {
+				if (StaticMeshActor->GetStaticMeshComponent()->ForcedLodModel == 1) {
+					MeshActors.Add(StaticMeshActor);
+				}
+			}
+		}
 	}
+
+	float AmountOfWork = MeshActors.Num();
+	FScopedSlowTask RootTask(AmountOfWork, (NSLOCTEXT("Generate", "Generate", "Generate")));
+	RootTask.MakeDialog();
+	for (auto MeshActor : MeshActors) {
+		SelectedStaticMeshActor = MeshActor;
+		SelectedStaticMeshLODChain = AutoEvaluateLodChain(MeshActor);
+		GenerateLODForSelected();
+		RootTask.EnterProgressFrame(1, FText::FromString("Generate"));
+	}
+	RefreshPreviewMatrix();
 }
 
-void ULODEditor::Deactivate()
+TArray<FStaticMeshChainNode> ULODEditor::AutoEvaluateLodChain(AStaticMeshActor* MeshActor)
 {
-	if (OnActorSelectionChangedHandle.IsValid()) {
-		FLevelEditorModule& LevelEditor = FModuleManager::GetModuleChecked<FLevelEditorModule>("LevelEditor");
-		LevelEditor.OnActorSelectionChanged().Remove(OnActorSelectionChangedHandle);
-		OnActorSelectionChangedHandle.Reset();
+	TArray<FStaticMeshChainNode> LodChain;
+	TArray<float> LodDistance = { 0, 3000, 6000, 10000, 18000, 30000 };
+	TArray<float> LodPercentTriangles = { 1.0f, 0.7f, 0.4f, 0.1f, 0.04f, 0.01f };
+	if (!MeshActor)
+		return LodChain;
+	UStaticMesh* StaticMesh = MeshActor->GetStaticMeshComponent()->GetStaticMesh();
+	if (!StaticMesh)
+		return LodChain;
+	float SphereRadius = StaticMesh->GetBounds().SphereRadius;
+	int DesiredLodCount = 1;
+	int DesiredImpostorResolution = 1024;
+	if (SphereRadius > 1200) {
+		DesiredLodCount = 4;
+		DesiredImpostorResolution = 2048;
 	}
-	StaticMeshesForConfig.Reset();
-	for (auto Mesh : StaticMeshes) {
-		StaticMeshesForConfig.AddUnique(Mesh);
+	else if (SphereRadius > 800) {
+		DesiredLodCount = 3;
+		DesiredImpostorResolution = 2048;
 	}
-	TryUpdateDefaultConfigFile();
+	else {
+		DesiredLodCount = 3;
+		DesiredImpostorResolution = 1024;
+	}
+	LodChain.SetNum(DesiredLodCount);
+	ImposterSettings.Resolution = DesiredImpostorResolution;
+	for (int i = 0; i < DesiredLodCount; i++) {
+		if (i != DesiredLodCount - 1) {
+			LodChain[i].Type = EStaticMeshLODGenerateType::Reduce;
+			LodChain[i].ReductionSettings.PercentTriangles = LodPercentTriangles[i];
+		}
+		else {
+			LodChain[i].Type = EStaticMeshLODGenerateType::Imposter;
+		}
+		LodChain[i].bUseDistance = true;
+		LodChain[i].Distance = LodDistance[i];
+	}
+	return LodChain;
+}
+
+void ULODEditor::AutoEvaluateLodChainForSelected()
+{
+	SelectedStaticMeshLODChain = AutoEvaluateLodChain(SelectedStaticMeshActor);
 }
 
 void ULODEditor::OnActorSelectionChanged(const TArray<UObject*>& NewSelection, bool bForceRefresh)
@@ -218,11 +275,10 @@ void ULODEditor::OnActorSelectionChanged(const TArray<UObject*>& NewSelection, b
 		return;
 	}
 	AStaticMeshActor* StaticMeshActor = Cast<AStaticMeshActor>(NewSelection[0]);
-	if (StaticMeshActor && PreviewActors.Contains(StaticMeshActor)) {
+	if (StaticMeshActor && StaticMeshActor->Tags.Contains("LODPreviewActor")) {
 		SelectedStaticMeshActor = StaticMeshActor;
 		RefreshLODChain();
 	}
-	
 }
 
 void ULODEditor::RefreshLODChain()
@@ -245,7 +301,7 @@ void ULODEditor::RefreshLODChain()
 void ULODEditor::ApplyImposterToLODChain(AStaticMeshActor* InStaticMeshActor, AActor* ImposterSpritesActor, int TargetLODIndex, float ScreenSize)
 {
 	if (!InStaticMeshActor || !ImposterSpritesActor)
-		return;
+	return;
 	UStaticMesh* StaticMesh = InStaticMeshActor->GetStaticMeshComponent()->GetStaticMesh();
 	UClass* BPClass = ImposterSpritesActor->GetClass();
 	if (FIntProperty* ResolutionProp = FindFProperty<FIntProperty>(BPClass, "Resolution")) {
@@ -325,63 +381,65 @@ void ULODEditor::ApplyImposterToLODChain(AStaticMeshActor* InStaticMeshActor, AA
 	UTexture* NewObj = TextureRenderTarget2D->ConstructTexture2D(MIC, "BaseColor", TextureRenderTarget2D->GetMaskedFlags() | RF_Public | RF_Standalone,
 		static_cast<EConstructTextureFlags>(CTF_Default | CTF_SkipPostEdit), /*InAlphaOverride = */nullptr);
 	NewObj->CompressionSettings = TextureCompressionSettings::TC_Default;
+	NewObj->LODGroup = TextureGroup::TEXTUREGROUP_World;
 	NewObj->MarkPackageDirty();
 	NewObj->PostEditChange();
 	MIC->SetTextureParameterValueEditorOnly(FName("BaseColor"), NewObj);
-		
+
 	TextureRenderTarget2D = Cast<UTextureRenderTarget2D>(TargetMaps[NormalIndex]);
 	NewObj = TextureRenderTarget2D->ConstructTexture2D(MIC, "Normal", TextureRenderTarget2D->GetMaskedFlags() | RF_Public | RF_Standalone,
-			static_cast<EConstructTextureFlags>(CTF_Default | CTF_AllowMips | CTF_SkipPostEdit), /*InAlphaOverride = */nullptr);
-		NewObj->CompressionSettings = TextureCompressionSettings::TC_Default;
-		NewObj->MarkPackageDirty();
-		NewObj->PostEditChange();
-		MIC->SetTextureParameterValueEditorOnly(FName("Normal"), NewObj);
-		
-		if (FIntProperty* Prop = FindFProperty<FIntProperty>(BPClass, "FramesXYInternal")) {
-			int FrameXY = Prop->GetSignedIntPropertyValue_InContainer(ImposterSpritesActor);
-			MIC->SetScalarParameterValueEditorOnly(FName("FramesXY"), FrameXY);
+		static_cast<EConstructTextureFlags>(CTF_Default | CTF_AllowMips | CTF_SkipPostEdit), /*InAlphaOverride = */nullptr);
+	NewObj->CompressionSettings = TextureCompressionSettings::TC_Default;
+	NewObj->LODGroup = TextureGroup::TEXTUREGROUP_World;
+	NewObj->MarkPackageDirty();
+	NewObj->PostEditChange();
+	MIC->SetTextureParameterValueEditorOnly(FName("Normal"), NewObj);
+
+	if (FIntProperty* Prop = FindFProperty<FIntProperty>(BPClass, "FramesXYInternal")) {
+		int FrameXY = Prop->GetSignedIntPropertyValue_InContainer(ImposterSpritesActor);
+		MIC->SetScalarParameterValueEditorOnly(FName("FramesXY"), FrameXY);
+	}
+	if (FNumericProperty* Prop = FindFProperty<FNumericProperty>(BPClass, "Object Radius")) {
+		double ObjectRadius = 0;
+		Prop->GetValue_InContainer(ImposterSpritesActor, &ObjectRadius);
+		MIC->SetScalarParameterValueEditorOnly(FName("Default Mesh Size"), ObjectRadius * 2);
+	}
+	if (FProperty* Prop = FindFProperty<FProperty>(BPClass, "Offset Vector")) {
+		FVector OffsetVector;
+		Prop->GetValue_InContainer(ImposterSpritesActor, &OffsetVector);
+		MIC->SetVectorParameterValueEditorOnly(FName("Pivot Offset"), FLinearColor(OffsetVector));
+	}
+
+	if (bNeedNewMesh) {
+		const int32 BaseLOD = 0;
+		FStaticMeshSourceModel* SourceModel = nullptr;
+		if (TargetLODIndex <= StaticMesh->GetNumSourceModels()) {
+			SourceModel = &StaticMesh->GetSourceModel(TargetLODIndex);
 		}
-		if (FNumericProperty* Prop = FindFProperty<FNumericProperty>(BPClass, "Object Radius")) {
-			double ObjectRadius = 0;
-			Prop->GetValue_InContainer(ImposterSpritesActor, &ObjectRadius);
-			MIC->SetScalarParameterValueEditorOnly(FName("Default Mesh Size"), ObjectRadius * 2);
+		else {
+			TargetLODIndex = StaticMesh->GetNumSourceModels();
+			SourceModel = &StaticMesh->AddSourceModel();
 		}
-		if (FProperty* Prop = FindFProperty<FProperty>(BPClass, "Offset Vector")) {
-			FVector OffsetVector;
-			Prop->GetValue_InContainer(ImposterSpritesActor, &OffsetVector);
-			MIC->SetVectorParameterValueEditorOnly(FName("Pivot Offset"), FLinearColor(OffsetVector));
-		}
-		
-		if (bNeedNewMesh) {
-			const int32 BaseLOD = 0;
-			FStaticMeshSourceModel* SourceModel = nullptr;
-			if (TargetLODIndex <= StaticMesh->GetNumSourceModels()) {
-				SourceModel = &StaticMesh->GetSourceModel(TargetLODIndex);
-			}
-			else {
-				TargetLODIndex = StaticMesh->GetNumSourceModels();
-				SourceModel = &StaticMesh->AddSourceModel();
-			}
-			FMeshDescription& NewMeshDescription = *StaticMesh->CreateMeshDescription(TargetLODIndex);
-			FStaticMeshAttributes(NewMeshDescription).Register();
-		
-			UProceduralMeshComponent* ProceduralMeshComp = ImposterSpritesActor->GetComponentByClass<UProceduralMeshComponent>();
-			NewMeshDescription = BuildMeshDescription(ProceduralMeshComp);
-		
-			SourceModel->BuildSettings = StaticMesh->GetSourceModel(BaseLOD).BuildSettings;
-			SourceModel->BuildSettings.bUseHighPrecisionTangentBasis = false;
-			SourceModel->BuildSettings.bUseFullPrecisionUVs = false;
-			SourceModel->BuildSettings.bRecomputeNormals = false;
-			SourceModel->BuildSettings.bRecomputeTangents = false;
-			SourceModel->BuildSettings.bRemoveDegenerates = true;
-			SourceModel->BuildSettings.BuildScale3D = FVector(1, 1, 1);
-			SourceModel->ScreenSize.Default = ScreenSize;
-		
-			StaticMesh->CommitMeshDescription(TargetLODIndex);
-			FMeshSectionInfo Info = StaticMesh->GetSectionInfoMap().Get(TargetLODIndex, 0);
-			Info.MaterialIndex = MaterialIndex;
-			StaticMesh->GetSectionInfoMap().Set(TargetLODIndex, 0, Info);
-		}
+		FMeshDescription& NewMeshDescription = *StaticMesh->CreateMeshDescription(TargetLODIndex);
+		FStaticMeshAttributes(NewMeshDescription).Register();
+
+		UProceduralMeshComponent* ProceduralMeshComp = ImposterSpritesActor->GetComponentByClass<UProceduralMeshComponent>();
+		NewMeshDescription = BuildMeshDescription(ProceduralMeshComp);
+
+		SourceModel->BuildSettings = StaticMesh->GetSourceModel(BaseLOD).BuildSettings;
+		SourceModel->BuildSettings.bUseHighPrecisionTangentBasis = false;
+		SourceModel->BuildSettings.bUseFullPrecisionUVs = false;
+		SourceModel->BuildSettings.bRecomputeNormals = false;
+		SourceModel->BuildSettings.bRecomputeTangents = false;
+		SourceModel->BuildSettings.bRemoveDegenerates = true;
+		SourceModel->BuildSettings.BuildScale3D = FVector(1, 1, 1);
+		SourceModel->ScreenSize.Default = ScreenSize;
+
+		StaticMesh->CommitMeshDescription(TargetLODIndex);
+		FMeshSectionInfo Info = StaticMesh->GetSectionInfoMap().Get(TargetLODIndex, 0);
+		Info.MaterialIndex = MaterialIndex;
+		StaticMesh->GetSectionInfoMap().Set(TargetLODIndex, 0, Info);
+	}
 }
 
 void ULODEditor::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)

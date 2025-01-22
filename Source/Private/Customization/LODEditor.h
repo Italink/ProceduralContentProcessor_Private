@@ -51,7 +51,6 @@ public:
 
 	UPROPERTY(EditAnywhere, meta = (EditConditionHides, HideEditConditionToggle, EditCondition = "Type==EStaticMeshLODGenerateType::Reduce"))
 	FMeshReductionSettings ReductionSettings; 
-
 };
 
 UCLASS(EditInlineNew, CollapseCategories, config = ProceduralContentProcessor, defaultconfig, Category = "Model")
@@ -87,23 +86,23 @@ public:
 	UPROPERTY(EditAnywhere)
 	TArray<FStaticMeshChainNode> SelectedStaticMeshLODChain;
 
-	UPROPERTY(Transient)
-	TArray<TObjectPtr<AActor>> PreviewActors;
+	virtual void Activate() override;
 
-	//UFUNCTION(CallInEditor)
-	void Collect();
+	virtual void Deactivate() override;
 
-	//UFUNCTION(CallInEditor)
-	void ApplyAll();
+	TArray<FStaticMeshChainNode> AutoEvaluateLodChain(AStaticMeshActor* MeshActor);
 
-	UFUNCTION(BlueprintCallable, CallInEditor)
+	UFUNCTION(BlueprintCallable, CallInEditor, meta = (DisplayPriority = 10))
+	void AutoEvaluateLodChainForSelected();
+
+	UFUNCTION(BlueprintCallable, CallInEditor, meta = (DisplayPriority = 20))
 	void GenerateLODForSelected();
 
-	UFUNCTION(BlueprintCallable, CallInEditor)
-	void RefreshPreviewMatrix();
+	UFUNCTION(BlueprintCallable, CallInEditor, meta = (DisplayPriority = 30))
+	void GenerateLODForAllByAuto();
 
-	virtual void Activate() override;
-	virtual void Deactivate() override;
+	UFUNCTION(BlueprintCallable, CallInEditor, meta = (DisplayPriority = 40))
+	void RefreshPreviewMatrix();
 
 	FDelegateHandle OnActorSelectionChangedHandle;
 	void OnActorSelectionChanged(const TArray<UObject*>& NewSelection, bool bForceRefresh);
