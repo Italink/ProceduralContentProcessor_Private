@@ -7,7 +7,7 @@
 #include "Widgets/Input/STextComboBox.h"
 #include "IDetailChildrenBuilder.h"
 
-#define LOCTEXT_NAMESPACE "LevelStreamingPersistenceEditor"
+#define LOCTEXT_NAMESPACE "ProceduralContentProcessor"
 
 TSharedRef<IDetailCustomization> FDetailCustomization_LevelStreamingPersistenceEditorSettings::MakeInstance()
 {

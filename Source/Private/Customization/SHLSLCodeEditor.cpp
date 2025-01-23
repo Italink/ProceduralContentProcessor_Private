@@ -15,7 +15,7 @@
 #include "Text/HLSLSyntaxHighlighterMarshaller.h"
 #include "NiagaraEditorStyle.h"
 
-#define LOCTEXT_NAMESPACE "NiagaraGeneratedCodeView"
+#define LOCTEXT_NAMESPACE "ProceduralContentProcessor"
 
 void SHLSLCodeEditor::Construct(const FArguments& InArgs, FText InHLSLCode)
 {
