@@ -92,16 +92,16 @@ public:
 
 	TArray<FStaticMeshChainNode> AutoEvaluateLodChain(AStaticMeshActor* MeshActor);
 
-	UFUNCTION(BlueprintCallable, CallInEditor, meta = (DisplayPriority = 10))
+	UFUNCTION(BlueprintCallable, CallInEditor, meta = (DisplayPriority = 10, DisplayName = "Auto Evaluate For Selected"))
 	void AutoEvaluateLodChainForSelected();
 
-	UFUNCTION(BlueprintCallable, CallInEditor, meta = (DisplayPriority = 20))
+	UFUNCTION(BlueprintCallable, CallInEditor, meta = (DisplayPriority = 20, DisplayName = "Generate For Selected"))
 	void GenerateLODForSelected();
 
-	UFUNCTION(BlueprintCallable, CallInEditor, meta = (DisplayPriority = 30))
+	UFUNCTION(BlueprintCallable, CallInEditor, meta = (DisplayPriority = 30, DisplayName = "Auto Generate For All"))
 	void GenerateLODForAllByAuto();
 
-	UFUNCTION(BlueprintCallable, CallInEditor, meta = (DisplayPriority = 40))
+	UFUNCTION(BlueprintCallable, CallInEditor, meta = (DisplayPriority = 40, DisplayName = "RefreshPreviewMatrix"))
 	void RefreshPreviewMatrix();
 
 	FDelegateHandle OnActorSelectionChangedHandle;
