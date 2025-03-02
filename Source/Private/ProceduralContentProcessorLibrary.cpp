@@ -123,6 +123,20 @@ void UProceduralContentProcessorLibrary::AddTextField(FProceduralObjectMatrix& M
 	Matrix.bIsDirty = true;
 }
 
+TArray<UObject*> UProceduralContentProcessorLibrary::GetAllObjectsOfClass(UClass* Class, bool bIncludeDerivedClasses)
+{
+	TArray<UObject*> Results;
+	GetObjectsOfClass(Class, Results, bIncludeDerivedClasses);
+	return Results;
+}
+
+TArray<UObject*> UProceduralContentProcessorLibrary::GetAllObjectsWithOuter(UObject* Outer, bool bIncludeNestedObjects)
+{
+	TArray<UObject*> Results;
+	GetObjectsWithOuter(Outer, Results, bIncludeNestedObjects);
+	return Results;
+}
+
 bool UProceduralContentProcessorLibrary::ObjectIsAsset(const UObject* InObject)
 {
 	if(InObject == nullptr)
@@ -147,7 +161,7 @@ void UProceduralContentProcessorLibrary::EndTransaction()
 	GEditor->EndTransaction();
 }
 
-TArray<UClass*> UProceduralContentProcessorLibrary::GetDerivedClasses(const UClass* ClassToLookFor, bool bRecursive)
+TArray<UClass*> UProceduralContentProcessorLibrary::GetAllDerivedClasses(const UClass* ClassToLookFor, bool bRecursive)
 {
 	TArray<UClass*> Results;
 	::GetDerivedClasses(ClassToLookFor, Results, bRecursive);
@@ -449,6 +463,11 @@ void UProceduralContentProcessorLibrary::ShowObjectDetailsView(UObject* InObject
 	}
 }
 
+void UProceduralContentProcessorLibrary::ShowObjectEditor(UObject* InObject)
+{
+	GEditor->EditObject(InObject);
+}
+
 UObject* UProceduralContentProcessorLibrary::CopyProperties(UObject* SourceObject, UObject* TargetObject)
 {
 	if(SourceObject == nullptr || TargetObject == nullptr)
@@ -728,6 +747,241 @@ bool UProceduralContentProcessorLibrary::DeprojectScreenToWorld(const FVector2D&
 UPhysicalMaterial* UProceduralContentProcessorLibrary::GetSimplePhysicalMaterial(UPrimitiveComponent* Component)
 {
 	return Component->BodyInstance.GetSimplePhysicalMaterial();
+}
+
+TArray<AActor*> UProceduralContentProcessorLibrary::BreakISM(AActor* InISMActor, bool bDestorySourceActor /*= true*/)
+{
+	TArray<AActor*> Actors;
+	if (!InISMActor)
+		return Actors;
+	ULayersSubsystem* LayersSubsystem = GEditor->GetEditorSubsystem<ULayersSubsystem>();
+	TArray<UInstancedStaticMeshComponent*> InstanceComps;
+	InISMActor->GetComponents(InstanceComps, true);
+	UWorld* World = InISMActor->GetWorld();
+	if (!InstanceComps.IsEmpty()) {
+		for (auto& ISMC : InstanceComps) {
+			for (int i = 0; i < ISMC->GetInstanceCount(); i++) {
+				FActorSpawnParameters SpawnInfo;
+				SpawnInfo.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+				FTransform Transform;
+				ISMC->GetInstanceTransform(i, Transform, true);
+				auto NewActor = World->SpawnActor<AStaticMeshActor>(AStaticMeshActor::StaticClass(), Transform, SpawnInfo);
+				NewActor->GetStaticMeshComponent()->SetStaticMesh(ISMC->GetStaticMesh());
+				NewActor->SetActorLabel(InISMActor->GetActorLabel());
+				auto Materials = ISMC->GetMaterials();
+				for (int j = 0; j < Materials.Num(); j++)
+					NewActor->GetStaticMeshComponent()->SetMaterial(j, Materials[j]);
+				NewActor->Modify();
+				NewActor->SetActorLabel(MakeUniqueObjectName(World, AStaticMeshActor::StaticClass(), *ISMC->GetStaticMesh()->GetName()).ToString());
+				Actors.Add(NewActor);
+				LayersSubsystem->InitializeNewActorLayers(NewActor);
+				const bool bCurrentActorSelected = GUnrealEd->GetSelectedActors()->IsSelected(InISMActor);
+				if (bCurrentActorSelected)
+				{
+					// The source actor was selected, so deselect the old actor and select the new one.
+					GUnrealEd->GetSelectedActors()->Modify();
+					GUnrealEd->SelectActor(NewActor, bCurrentActorSelected, false);
+					GUnrealEd->SelectActor(InISMActor, false, false);
+				}
+				{
+					LayersSubsystem->DisassociateActorFromLayers(NewActor);
+					NewActor->Layers.Empty();
+					LayersSubsystem->AddActorToLayers(NewActor, InISMActor->Layers);
+				}
+			}
+			ISMC->PerInstanceSMData.Reset();
+			if (bDestorySourceActor) {
+				LayersSubsystem->DisassociateActorFromLayers(InISMActor);
+				InISMActor->GetWorld()->EditorDestroyActor(InISMActor, true);
+			}
+			GUnrealEd->NoteSelectionChange();
+		}
+	}
+	return Actors;
+}
+
+AActor* UProceduralContentProcessorLibrary::MergeISM(TArray<AActor*> InSourceActors, TSubclassOf<UInstancedStaticMeshComponent> InISMClass, bool bDestorySourceActor /*= true*/)
+{
+	if (InSourceActors.IsEmpty() || !InISMClass)
+		return nullptr;
+	ULayersSubsystem* LayersSubsystem = GEditor->GetEditorSubsystem<ULayersSubsystem>();
+	FActorSpawnParameters SpawnInfo;
+	SpawnInfo.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	UWorld* World = InSourceActors[0]->GetWorld();
+	FBoxSphereBounds Bounds;
+	TMap<UStaticMesh*, TArray<FTransform>> InstancedMap;
+	for (auto Actor : InSourceActors) {
+		TArray<UStaticMeshComponent*> MeshComps;
+		Actor->GetComponents(MeshComps, true);
+		for (auto MeshComp : MeshComps) {
+			UStaticMesh* Mesh = MeshComp->GetStaticMesh();
+			auto& InstancedInfo = InstancedMap.FindOrAdd(Mesh);
+			Bounds = MeshComp->Bounds + Bounds;
+			InstancedInfo.Add(MeshComp->K2_GetComponentToWorld());
+		}
+		TArray<UInstancedStaticMeshComponent*> InstMeshComps;
+		Actor->GetComponents(InstMeshComps, true);
+		for (auto InstMeshComp : InstMeshComps) {
+			UStaticMesh* Mesh = InstMeshComp->GetStaticMesh();
+			auto& InstancedInfo = InstancedMap.FindOrAdd(Mesh);
+			FTransform Transform;
+			Bounds = InstMeshComp->Bounds + Bounds;
+			for (int i = 0; i < InstMeshComp->GetInstanceCount(); i++) {
+				InstMeshComp->GetInstanceTransform(i, Transform, true);
+				InstancedInfo.Add(Transform);
+			}
+		}
+	}
+	FTransform Transform;
+	Transform.SetLocation(Bounds.Origin);
+	auto NewISMActor = World->SpawnActor<AActor>(AActor::StaticClass(), Transform, SpawnInfo);
+	USceneComponent* RootComponent = NewObject<USceneComponent>(NewISMActor, USceneComponent::GetDefaultSceneRootVariableName(), RF_Transactional);
+	RootComponent->Mobility = EComponentMobility::Static;
+	RootComponent->bVisualizeComponent = true;
+	NewISMActor->SetRootComponent(RootComponent);
+	NewISMActor->AddInstanceComponent(RootComponent);
+	RootComponent->OnComponentCreated();
+	RootComponent->RegisterComponent();
+
+	for (const auto& InstancedInfo : InstancedMap) {
+		UInstancedStaticMeshComponent* ISMComponent = NewObject<UInstancedStaticMeshComponent>(NewISMActor, InISMClass, *InstancedInfo.Key->GetName(), RF_Transactional);
+		ISMComponent->Mobility = EComponentMobility::Static;
+		NewISMActor->AddInstanceComponent(ISMComponent);
+		ISMComponent->AttachToComponent(RootComponent, FAttachmentTransformRules::KeepRelativeTransform);
+		ISMComponent->OnComponentCreated();
+		ISMComponent->RegisterComponent();
+		ISMComponent->SetStaticMesh(InstancedInfo.Key);
+		for (auto InstanceTransform : InstancedInfo.Value) {
+			ISMComponent->AddInstance(InstanceTransform, true);
+		}
+	}
+	NewISMActor->Modify();
+	LayersSubsystem->InitializeNewActorLayers(NewISMActor);
+	GUnrealEd->GetSelectedActors()->Modify();
+	GUnrealEd->SelectActor(NewISMActor, true, false);
+	if (bDestorySourceActor) {
+		for (auto Actor : InSourceActors) {
+			LayersSubsystem->DisassociateActorFromLayers(Actor);
+			World->EditorDestroyActor(Actor, true);
+		}
+	}
+	return NewISMActor;
+}
+
+void UProceduralContentProcessorLibrary::SetHLODLayer(AActor* InActor, UHLODLayer* InHLODLayer)
+{
+	if (InActor->GetHLODLayer() != InHLODLayer) {
+		InActor->Modify();
+		InActor->bEnableAutoLODGeneration = InHLODLayer != nullptr;
+		InActor->SetHLODLayer(InHLODLayer);
+	}
+}
+
+void UProceduralContentProcessorLibrary::SelectActor(AActor* InActor)
+{
+	GEditor->GetSelectedActors()->Modify();
+	GEditor->GetSelectedActors()->BeginBatchSelectOperation();
+	GEditor->SelectNone(false, true, true);
+	GEditor->SelectActor(InActor, true, false, true);
+	GEditor->GetSelectedActors()->EndBatchSelectOperation(/*bNotify*/false);
+	GEditor->NoteSelectionChange();
+}
+
+void UProceduralContentProcessorLibrary::LookAtActor(AActor* InActor)
+{
+	GEditor->MoveViewportCamerasToActor(*InActor, true);
+}
+
+AActor* UProceduralContentProcessorLibrary::SpawnTransientActor(UObject* WorldContextObject, TSubclassOf<AActor> Class, FTransform Transform)
+{
+	if (WorldContextObject == nullptr)
+		return nullptr;
+	UWorld* World = WorldContextObject->GetWorld();
+	AActor* Actor = World->SpawnActor(Class, &Transform);
+	if (Actor)
+		Actor->SetFlags(RF_Transient);
+	return Actor;
+}
+
+AActor* UProceduralContentProcessorLibrary::ReplaceActor(AActor* InSrc, TSubclassOf<AActor> InDst, bool bNoteSelectionChange /*= false*/)
+{
+	if (!InSrc || !InDst)
+		return nullptr;
+	GEditor->BeginTransaction(LOCTEXT("ReplaceActor", "Replace Actor"));
+	FTransform Transform = InSrc->GetTransform();
+	auto NewActor = GUnrealEd->ReplaceActor(InSrc, InDst, nullptr, bNoteSelectionChange);
+	NewActor->SetActorTransform(Transform);
+	GEditor->EndTransaction();
+	return NewActor;
+}
+
+void UProceduralContentProcessorLibrary::ReplaceActors(TMap<AActor*, TSubclassOf<AActor>> ActorMap, bool bNoteSelectionChange)
+{
+	if (GUnrealEd && !ActorMap.IsEmpty()) {
+		GEditor->BeginTransaction(LOCTEXT("ReplaceActors", "Replace Actors"));
+		for (auto ActorPair : ActorMap) {
+			if (ActorPair.Key && ActorPair.Value) {
+				FTransform Transform = ActorPair.Key->GetTransform();
+				auto NewActor = GUnrealEd->ReplaceActor(ActorPair.Key, ActorPair.Value, nullptr, bNoteSelectionChange);
+				NewActor->SetActorTransform(Transform);
+			}
+		}
+		GEditor->EndTransaction();
+	}
+}
+
+void UProceduralContentProcessorLibrary::ActorSetIsSpatiallyLoaded(AActor* Actor, bool bIsSpatiallyLoaded)
+{
+	Actor->SetIsSpatiallyLoaded(bIsSpatiallyLoaded);
+}
+
+bool UProceduralContentProcessorLibrary::ActorAddDataLayer(AActor* Actor, UDataLayerAsset* DataLayerAsset)
+{
+	if (Actor && DataLayerAsset) {
+		UDataLayerInstance* Instance = GEditor->GetEditorSubsystem<UDataLayerEditorSubsystem>()->GetDataLayerInstance(DataLayerAsset);
+		if (Instance) {
+			return Instance->AddActor(Actor);
+		}
+	}
+	return false;
+}
+
+bool UProceduralContentProcessorLibrary::ActorRemoveDataLayer(AActor* Actor, UDataLayerAsset* DataLayerAsset)
+{
+	if (Actor && DataLayerAsset) {
+		UDataLayerInstance* Instance = GEditor->GetEditorSubsystem<UDataLayerEditorSubsystem>()->GetDataLayerInstance(DataLayerAsset);
+		if (Instance) {
+			return Instance->RemoveActor(Actor);
+		}
+	}
+	return false;
+}
+
+bool UProceduralContentProcessorLibrary::ActorContainsDataLayer(AActor* Actor, UDataLayerAsset* DataLayerAsset)
+{
+	if (Actor && DataLayerAsset) {
+		UDataLayerInstance* Instance = GEditor->GetEditorSubsystem<UDataLayerEditorSubsystem>()->GetDataLayerInstance(DataLayerAsset);
+		if (Instance) {
+			return Actor->ContainsDataLayer(Instance);
+		}
+	}
+	return false;
+}
+
+FName UProceduralContentProcessorLibrary::ActorGetRuntimeGrid(AActor* Actor)
+{
+	if (Actor) {
+		return Actor->GetRuntimeGrid();
+	}
+	return FName();
+}
+
+void UProceduralContentProcessorLibrary::ActorSetRuntimeGrid(AActor* Actor, FName GridName)
+{
+	if (Actor && Actor->GetRuntimeGrid() != GridName) {
+		Actor->SetRuntimeGrid(GridName);
+		Actor->Modify();
+	}
 }
 
 TArray<TSharedPtr<FSlowTask>> UProceduralContentProcessorLibrary::SlowTasks;
