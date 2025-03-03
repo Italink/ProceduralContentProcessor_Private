@@ -144,6 +144,20 @@ bool UProceduralContentProcessorLibrary::ObjectIsAsset(const UObject* InObject)
 	return InObject->IsAsset();
 }
 
+UBlueprint* UProceduralContentProcessorLibrary::GetBlueprint(UObject* InObject)
+{
+	if (InObject == nullptr)
+		return nullptr;
+	if (UBlueprint* Blueprint = Cast<UBlueprint>(InObject)) {
+		return Blueprint;
+	}
+	UClass* Class = Cast<UClass>(InObject);
+	if (Class == nullptr) {
+		Class = InObject->GetClass();
+	}
+	return Cast<UBlueprint>(Class->ClassGeneratedBy);
+}
+
 void UProceduralContentProcessorLibrary::BeginTransaction(FText Text)
 {
 	GEditor->BeginTransaction(Text);

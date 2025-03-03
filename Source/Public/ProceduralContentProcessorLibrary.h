@@ -191,6 +191,9 @@ public:
 	static bool ObjectIsAsset(const UObject* InObject);
 
 	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
+	static UBlueprint* GetBlueprint(UObject* InObject);
+
+	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")
 	static bool IsNaniteEnable(UStaticMesh* InMesh);
 
 	UFUNCTION(BlueprintCallable, Category = "ProceduralContentProcessor")

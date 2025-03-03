@@ -43,8 +43,8 @@ void UFrameAnimCaptureTool::Activate()
 			CaptureActor->SetFlags(RF_Transient);
 		}
 		USceneCaptureComponent2D* SceneCaptureComp = CaptureActor->GetCaptureComponent2D();
-		SceneCaptureComp->bCaptureEveryFrame = false;
-		SceneCaptureComp->bCaptureOnMovement = false;
+		SceneCaptureComp->bCaptureEveryFrame = true;
+		SceneCaptureComp->bCaptureOnMovement = true;
 		SceneCaptureComp->TextureTarget = CaptureRT;
 		SceneCaptureComp->PrimitiveRenderMode = ESceneCapturePrimitiveRenderMode::PRM_UseShowOnlyList;
 		SceneCaptureComp->ShowFlagSettings.Add(FEngineShowFlagsSetting{ TEXT("Lighting"), false });
