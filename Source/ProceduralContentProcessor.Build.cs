@@ -1,5 +1,5 @@
 // Copyright 1998-2018 Epic Games, Inc. All Rights Reserved.
-
+using System.IO;
 using UnrealBuildTool;
 
 public class ProceduralContentProcessor : ModuleRules
@@ -46,8 +46,10 @@ public class ProceduralContentProcessor : ModuleRules
                 "WorldPartitionHLODUtilities",
                 "WorkspaceMenuStructure",
                 "Landscape",
+                "LandscapeEditor",
                 "Foliage",
                 "Kismet",
+                "ImageCore",
                 "GeometryProcessingInterfaces",
                 "DataLayerEditor",
                 "MeshModelingToolsExp",
@@ -68,9 +70,10 @@ public class ProceduralContentProcessor : ModuleRules
                 "Niagara",
                 "NiagaraEditor",
                 "MaterialEditor",
-                "PhysicsCore"
+                "PhysicsCore",
+                "WorldPartitionHLODUtilities"
 				// ... add private dependencies that you statically link with here ...	
 			}
-			);
-	}
+		);
+    }
 }

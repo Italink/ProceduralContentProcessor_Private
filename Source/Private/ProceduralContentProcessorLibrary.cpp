@@ -827,22 +827,20 @@ AActor* UProceduralContentProcessorLibrary::MergeISM(TArray<AActor*> InSourceAct
 	for (auto Actor : InSourceActors) {
 		TArray<UStaticMeshComponent*> MeshComps;
 		Actor->GetComponents(MeshComps, true);
+
 		for (auto MeshComp : MeshComps) {
 			UStaticMesh* Mesh = MeshComp->GetStaticMesh();
 			auto& InstancedInfo = InstancedMap.FindOrAdd(Mesh);
 			Bounds = MeshComp->Bounds + Bounds;
-			InstancedInfo.Add(MeshComp->K2_GetComponentToWorld());
-		}
-		TArray<UInstancedStaticMeshComponent*> InstMeshComps;
-		Actor->GetComponents(InstMeshComps, true);
-		for (auto InstMeshComp : InstMeshComps) {
-			UStaticMesh* Mesh = InstMeshComp->GetStaticMesh();
-			auto& InstancedInfo = InstancedMap.FindOrAdd(Mesh);
-			FTransform Transform;
-			Bounds = InstMeshComp->Bounds + Bounds;
-			for (int i = 0; i < InstMeshComp->GetInstanceCount(); i++) {
-				InstMeshComp->GetInstanceTransform(i, Transform, true);
-				InstancedInfo.Add(Transform);
+			if (auto ISMC = Cast<UInstancedStaticMeshComponent>(MeshComp)) {
+				FTransform Transform;
+				for (int i = 0; i < ISMC->GetInstanceCount(); i++) {
+					ISMC->GetInstanceTransform(i, Transform, true);
+					InstancedInfo.Add(Transform);
+				}
+			}
+			else {
+				InstancedInfo.Add(MeshComp->K2_GetComponentToWorld());
 			}
 		}
 	}

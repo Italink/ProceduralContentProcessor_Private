@@ -51,6 +51,14 @@ void ULODEditor::Deactivate()
 }
 
 
+void ULODEditor::ApplyMinLODForAll()
+{
+	for (auto StaticMesh : StaticMeshes) {
+		StaticMesh->Modify();
+		StaticMesh->SetMinLOD(MinLOD);
+	}
+}
+
 void ULODEditor::RefreshPreviewMatrix()
 {
 	UWorld* World = GetWorld();
@@ -65,6 +73,9 @@ void ULODEditor::RefreshPreviewMatrix()
 	float YOffset = 0;
 	TArray<AStaticMeshActor*> MeshActor;
 	for (auto StaticMesh : StaticMeshes) {
+		if (!StaticMesh) {
+			continue;
+		}
 		const FBoxSphereBounds& Bound = StaticMesh->GetBounds();
 		for (int Y = 0; Y < StaticMesh->GetNumLODs(); Y++) {
 			float ScreenSize = UProceduralContentProcessorLibrary::GetLodScreenSize(StaticMesh, Y);
@@ -72,6 +83,7 @@ void ULODEditor::RefreshPreviewMatrix()
 			AStaticMeshActor* PreviewActor = World->SpawnActor<AStaticMeshActor>(FVector(XOffset, YOffset, 0), FRotator(0, 0, 0));
 			PreviewActor->GetStaticMeshComponent()->SetStaticMesh(StaticMesh);
 			PreviewActor->GetStaticMeshComponent()->ForcedLodModel = Y + 1;
+			PreviewActor->GetStaticMeshComponent()->SetForceDisableNanite(true);
 			PreviewActor->SetActorLabel(FString::Printf(TEXT("LODPreviewActor[%s]:LOD%d"), *StaticMesh->GetName(), Y));
 			PreviewActor->Tags.Add("LODPreviewActor");
 			ATextRenderActor* TextActor = World->SpawnActor<ATextRenderActor>();
@@ -226,16 +238,20 @@ TArray<FStaticMeshChainNode> ULODEditor::AutoEvaluateLodChain(AStaticMeshActor* 
 {
 	TArray<FStaticMeshChainNode> LodChain;
 	TArray<float> LodDistance = { 0, 3000, 6000, 10000, 18000, 30000 };
-	TArray<float> LodPercentTriangles = { 1.0f, 0.7f, 0.4f, 0.1f, 0.04f, 0.01f };
+	TArray<float> LodPercentTriangles = { 1.0f, 0.5f, 0.25f, 0.1f, 0.05f, 0.001f };
 	if (!MeshActor)
 		return LodChain;
 	UStaticMesh* StaticMesh = MeshActor->GetStaticMeshComponent()->GetStaticMesh();
 	if (!StaticMesh)
 		return LodChain;
 	float SphereRadius = StaticMesh->GetBounds().SphereRadius;
+	int SourceTriangles = StaticMesh->GetNumTriangles(0);
 	int DesiredLodCount = 1;
 	int DesiredImpostorResolution = 1024;
-	if (SphereRadius > 1200) {
+	if (SourceTriangles < 200) {
+		DesiredLodCount = 1;
+	}
+	else if (SphereRadius > 1200) {
 		DesiredLodCount = 4;
 		DesiredImpostorResolution = 2048;
 	}
@@ -250,13 +266,13 @@ TArray<FStaticMeshChainNode> ULODEditor::AutoEvaluateLodChain(AStaticMeshActor* 
 	LodChain.SetNum(DesiredLodCount);
 	ImposterSettings.Resolution = DesiredImpostorResolution;
 	for (int i = 0; i < DesiredLodCount; i++) {
-		if (i != DesiredLodCount - 1) {
+		//if (i != DesiredLodCount - 1) {
 			LodChain[i].Type = EStaticMeshLODGenerateType::Reduce;
 			LodChain[i].ReductionSettings.PercentTriangles = LodPercentTriangles[i];
-		}
-		else {
-			LodChain[i].Type = EStaticMeshLODGenerateType::Imposter;
-		}
+		//}
+		//else {
+		//	LodChain[i].Type = EStaticMeshLODGenerateType::Imposter;
+		//}
 		LodChain[i].bUseDistance = true;
 		LodChain[i].Distance = LodDistance[i];
 	}

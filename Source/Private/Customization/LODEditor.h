@@ -53,7 +53,7 @@ public:
 	FMeshReductionSettings ReductionSettings; 
 };
 
-UCLASS(EditInlineNew, CollapseCategories, config = ProceduralContentProcessor, defaultconfig, Category = "Model")
+UCLASS(EditInlineNew, CollapseCategories, config = ProceduralContentProcessor, defaultconfig, Category = "Model", DisplayName = "LOD Editor")
 class PROCEDURALCONTENTPROCESSOR_API ULODEditor: public UProceduralWorldProcessor {
 	GENERATED_BODY()
 public:
@@ -70,6 +70,9 @@ public:
 
 	UPROPERTY(EditAnywhere, Config)
 	bool bEnableBuildSetting = false;
+
+	UPROPERTY(EditAnywhere, Config)
+	FPerPlatformInt MinLOD;
 
 	UPROPERTY(EditAnywhere, Config)
 	TSubclassOf<UObject> BP_Generate_ImposterSprites;
@@ -99,7 +102,10 @@ public:
 	void GenerateLODForSelected();
 
 	UFUNCTION(BlueprintCallable, CallInEditor, meta = (DisplayPriority = 30, DisplayName = "Auto Generate For All"))
-	void GenerateLODForAllByAuto();
+	void GenerateLODForAll();
+
+	UFUNCTION(BlueprintCallable, CallInEditor, meta = (DisplayPriority = 30, DisplayName = "Auto Generate For All"))
+	void ApplyMinLODForAll();
 
 	UFUNCTION(BlueprintCallable, CallInEditor, meta = (DisplayPriority = 40, DisplayName = "RefreshPreviewMatrix"))
 	void RefreshPreviewMatrix();

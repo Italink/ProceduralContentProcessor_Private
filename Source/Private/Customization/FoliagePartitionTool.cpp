@@ -10,6 +10,33 @@
 #include "Engine/StaticMeshActor.h"
 #include "InstancedFoliageActor.h"
 
+
+void UFoliagePartitionTool::Activate()
+{
+	StaticMeshes.Reset();
+	for (auto MeshPath : StaticMeshesForConfig) {
+		StaticMeshes.AddUnique(Cast<UStaticMesh>(MeshPath.TryLoad()));
+	}
+}
+
+void UFoliagePartitionTool::Deactivate()
+{
+
+}
+
+void UFoliagePartitionTool::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
+{
+	Super::PostEditChangeProperty(PropertyChangedEvent);
+	const FName PropertyName = (PropertyChangedEvent.Property != NULL) ? PropertyChangedEvent.Property->GetFName() : NAME_None;
+	if (PropertyName == GET_MEMBER_NAME_CHECKED(UFoliagePartitionTool, StaticMeshes)) {
+		StaticMeshesForConfig.Reset();
+		for (auto Mesh : StaticMeshes) {
+			StaticMeshesForConfig.AddUnique(Mesh);
+		}
+	}
+}
+
+
 void UFoliagePartitionTool::ToggleFoliagePartition()
 {
 	auto IsVaild = [this]()
@@ -21,7 +48,7 @@ void UFoliagePartitionTool::ToggleFoliagePartition()
 			return false;
 		if (auto MeshActor = Cast<AStaticMeshActor>(SelectActor)) {
 			UStaticMesh* Mesh = MeshActor->GetStaticMeshComponent()->GetStaticMesh();
-			if (Mesh && FoliageMeshes.Contains(FSoftObjectPath(Mesh))) {
+			if (Mesh && StaticMeshes.Contains(Mesh)) {
 				return true;
 			}
 		}
@@ -51,7 +78,7 @@ void UFoliagePartitionTool::ToggleFoliagePartition()
 		for (auto Actor : AllActors) {
 			if (AStaticMeshActor* MeshActor = Cast<AStaticMeshActor>(Actor)) {
 				UStaticMesh* Mesh = MeshActor->GetStaticMeshComponent()->GetStaticMesh();
-				if (Mesh && FoliageMeshes.Contains(FSoftObjectPath(Mesh))) {
+				if (Mesh && StaticMeshes.Contains(Mesh)) {
 					FVector Position = Actor->K2_GetActorLocation();
 					FIntPoint CellCoord(FMath::Floor((Position.X + Origin.X) / CellSize), FMath::Floor((Position.Y + Origin.Y) / CellSize));
 					PendingMergeActors.FindOrAdd(CellCoord).Add(Actor);
@@ -76,17 +103,17 @@ void UFoliagePartitionTool::ToggleFoliagePartition()
 					UStaticMesh* Mesh = MeshComp->GetStaticMesh();
 					auto& InstancedInfo = InstancedMap.FindOrAdd(Mesh);
 					Bounds = MeshComp->Bounds + Bounds;
-					InstancedInfo.Add(MeshComp->K2_GetComponentToWorld());
-				}
-				TArray<UInstancedStaticMeshComponent*> InstMeshComps;
-				Actor->GetComponents(InstMeshComps, true);
-				for (auto InstMeshComp : InstMeshComps) {
-					UStaticMesh* Mesh = InstMeshComp->GetStaticMesh();
-					auto& InstancedInfo = InstancedMap.FindOrAdd(Mesh);
 					FTransform Transform;
-					Bounds = InstMeshComp->Bounds + Bounds;
-					for (int i = 0; i < InstMeshComp->GetInstanceCount(); i++) {
-						InstMeshComp->GetInstanceTransform(i, Transform, true);
+					if (auto ISMC = Cast<UInstancedStaticMeshComponent>(MeshComp)) {
+						for (int i = 0; i < ISMC->GetInstanceCount(); i++) {
+							ISMC->GetInstanceTransform(i, Transform, true);
+							Transform.NormalizeRotation();
+							InstancedInfo.Add(Transform);
+						}
+					}
+					else {
+						Transform = MeshComp->K2_GetComponentToWorld();
+						Transform.NormalizeRotation();
 						InstancedInfo.Add(Transform);
 					}
 				}
@@ -195,5 +222,126 @@ void UFoliagePartitionTool::ToggleFoliagePartition()
 		Info.ExpireDuration = 2.0f;
 		Info.FadeOutDuration = 2.0f;
 		FSlateNotificationManager::Get().AddNotification(Info);
+	}
+}
+
+void UFoliagePartitionTool::BreakAllHISM()
+{
+	UWorld* World = GetWorld();
+	TArray<AActor*> AllActors;
+	UGameplayStatics::GetAllActorsOfClass(World, AActor::StaticClass(), AllActors);
+	for (auto Actor : AllActors) {
+		if (Actor->GetActorLabel().StartsWith("FoliagePartition_")) {
+			ULayersSubsystem* LayersSubsystem = GEditor->GetEditorSubsystem<ULayersSubsystem>();
+			TArray<UInstancedStaticMeshComponent*> InstanceComps;
+			Actor->GetComponents(InstanceComps, true);
+			if (!InstanceComps.IsEmpty()) {
+				for (auto& ISMC : InstanceComps) {
+					for (int i = 0; i < ISMC->GetInstanceCount(); i++) {
+						FActorSpawnParameters SpawnInfo;
+						SpawnInfo.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+						FTransform Transform;
+						ISMC->GetInstanceTransform(i, Transform, true);
+						auto NewActor = World->SpawnActor<AStaticMeshActor>(AStaticMeshActor::StaticClass(), Transform, SpawnInfo);
+						NewActor->GetStaticMeshComponent()->SetStaticMesh(ISMC->GetStaticMesh());
+						NewActor->SetActorLabel(Actor->GetActorLabel());
+						auto Materials = ISMC->GetMaterials();
+						for (int j = 0; j < Materials.Num(); j++)
+							NewActor->GetStaticMeshComponent()->SetMaterial(j, Materials[j]);
+						NewActor->Modify();
+						NewActor->SetActorLabel(MakeUniqueObjectName(World, AStaticMeshActor::StaticClass(), *ISMC->GetStaticMesh()->GetName()).ToString());
+						LayersSubsystem->InitializeNewActorLayers(NewActor);
+					}
+					ISMC->Modify();
+					ISMC->PerInstanceSMData.Reset();
+					ISMC->ClearInstances();
+					GUnrealEd->NoteSelectionChange();
+				}
+				World->EditorDestroyActor(Actor, true);
+			}
+		}
+	}
+}
+
+void UFoliagePartitionTool::Fixup()
+{
+	// 定义判断两个变换是否视为"重复"的阈值
+	const float LOCATION_THRESHOLD = 1.0f; // 位置阈值（厘米）
+	const float ROTATION_THRESHOLD = 0.5f; // 旋转阈值（度）
+
+	UWorld* World = GetWorld();
+	TArray<AActor*> AllActors;
+	UGameplayStatics::GetAllActorsOfClass(World, AActor::StaticClass(), AllActors);
+
+	for (auto Actor : AllActors) {
+		if (Actor->GetActorLabel().StartsWith("FoliagePartition_")) {
+			TArray<UInstancedStaticMeshComponent*> InstanceComps;
+			Actor->GetComponents(InstanceComps, true);
+
+			if (!InstanceComps.IsEmpty()) {
+				for (auto& ISMC : InstanceComps) {
+					TArray<FTransform> UniqueTransforms;
+					TArray<int32> InstancesToRemove;
+
+					// 收集所有实例并标记重复项
+					for (int32 i = 0; i < ISMC->GetInstanceCount(); i++) {
+						FTransform CurrentTransform;
+						ISMC->GetInstanceTransform(i, CurrentTransform, true);
+
+						bool bIsDuplicate = false;
+
+						// 与已收集的唯一变换比较
+						for (const auto& UniqueTransform : UniqueTransforms) {
+							// 检查位置是否足够接近
+							float LocationDistance = FVector::Distance(
+								CurrentTransform.GetLocation(),
+								UniqueTransform.GetLocation()
+							);
+
+							// 检查旋转是否足够接近
+							FRotator CurrentRot = CurrentTransform.Rotator();
+							FRotator UniqueRot = UniqueTransform.Rotator();
+							float RotationDiff = FMath::Max3(
+								FMath::Abs(CurrentRot.Pitch - UniqueRot.Pitch),
+								FMath::Abs(CurrentRot.Yaw - UniqueRot.Yaw),
+								FMath::Abs(CurrentRot.Roll - UniqueRot.Roll)
+							);
+
+							// 如果位置和旋转都在阈值内，则视为重复
+							if (LocationDistance <= LOCATION_THRESHOLD &&
+								RotationDiff <= ROTATION_THRESHOLD) {
+								bIsDuplicate = true;
+								break;
+							}
+						}
+
+						if (bIsDuplicate) {
+							InstancesToRemove.Add(i);
+						}
+						else {
+							UniqueTransforms.Add(CurrentTransform);
+						}
+					}
+
+					// 移除重复实例（注意要从后往前删，避免索引错乱）
+					if (!InstancesToRemove.IsEmpty()) {
+						// 排序并反转，确保从高索引开始删除
+						InstancesToRemove.Sort();
+
+						const int32 Count = InstancesToRemove.Num();
+						for (int32 i = 0; i < Count / 2; i++) {
+							Swap(InstancesToRemove[i], InstancesToRemove[Count - 1 - i]);
+						}
+						for (int32 Index : InstancesToRemove) {
+							ISMC->RemoveInstance(Index);
+						}
+
+						// 通知组件更新
+						ISMC->MarkRenderStateDirty();
+						UE_LOG(LogTemp, Log, TEXT("Removed %d duplicate instances from ISMC"), InstancesToRemove.Num());
+					}
+				}
+			}
+		}
 	}
 }

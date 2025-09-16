@@ -8,6 +8,9 @@
 #include "Selection.h"
 #include "LevelEditorViewport.h"
 #include "WorldPartition/HLOD/HLODSourceActorsFromCell.h"
+#include "WorldPartition/WorldPartitionStreamingDescriptor.h"
+#include "WorldPartition/WorldPartitionRuntimeHash.h"
+#include "../../../../../../../Source/Runtime/Engine/Classes/Components/InstancedStaticMeshComponent.h"
 
 #define LOCTEXT_NAMESPACE "ProceduralContentProcessor"
 
@@ -133,43 +136,52 @@ void SHLODOutliner::SetWorld(UWorld* InWorld)
 	mLevelActorDescInfoMap.Empty();
 	if (InWorld == nullptr || InWorld->GetWorldPartition() == nullptr)
 		return;
-	UWorldPartition* WorldPartition = InWorld->GetWorldPartition();
-	WorldPartition->ForEachActorDescContainer([&](UActorDescContainer* Containter) {
-		for (UActorDescContainer::TIterator<> Iterator(Containter); Iterator; ++Iterator) {
-			UClass* ActorClass = Iterator->GetActorNativeClass();
-			if (ActorClass == AWorldPartitionHLOD::StaticClass()) {
-				FWorldPartitionActorDesc Desc = **Iterator;
-				FString ActorName = Iterator->GetActorLabelOrName().ToString();
-				FRegexMatcher Matcher(FRegexPattern(TEXT("(.+)/(.+)_L(.+)_X(.+)_Y(.+)"), ERegexPatternFlags::CaseInsensitive), ActorName);
-				if (Matcher.FindNext()) {
-					FString HLODName = Matcher.GetCaptureGroup(1);
-					FString GridName = Matcher.GetCaptureGroup(2);
-					int LevelIndex = FCString::Atoi(*Matcher.GetCaptureGroup(3));
-					int CellX = FCString::Atoi(*Matcher.GetCaptureGroup(4));
-					int CellY = FCString::Atoi(*Matcher.GetCaptureGroup(5));
-					FActorDescInfo NewInfo;
-					NewInfo.CellX = CellX;
-					NewInfo.CellY = CellY;
-					NewInfo.ActorDesc = MakeShared<FWorldPartitionActorDesc>(Desc);
-					FHLODLevelInfo& LevelInfo = mLevelActorDescInfoMap.FindOrAdd(GridName).FindOrAdd(HLODName).FindOrAdd(LevelIndex);
-					LevelInfo.HLods.Add(NewInfo);
-					LevelInfo.LevelBound += Iterator->GetEditorBounds();;
-					bool bExisted = false;
-					for (auto Name : mGridNames) {
-						if (*Name == GridName) {
-							bExisted = true;
-							break;
-						}
-					}
-					if (!bExisted)
-						mGridNames.Add(MakeShared<FString>(GridName));
-				}
-			}
+
+	UE::Private::WorldPartition::FStreamingDescriptor StreamingDesc;
+	UE::Private::WorldPartition::FStreamingDescriptor::FStreamingDescriptorParams Params;
+	UE::Private::WorldPartition::FStreamingDescriptor::GenerateStreamingDescriptor(InWorld, StreamingDesc, Params);
+	for (UE::Private::WorldPartition::FStreamingDescriptor::FStreamingGrid& Grid : StreamingDesc.StreamingGrids){
+		mGridNames.Add(MakeShared<FString>(Grid.Name.ToString()));
+		for (UE::Private::WorldPartition::FStreamingDescriptor::FStreamingCell& Cell : Grid.StreamingCells){
 		}
-		});
-	if (!mGridNames.IsEmpty()) {
-		mGridNameComboBox->SetSelectedItem(mGridNames[0]);
 	}
+
+	//UWorldPartition* WorldPartition = InWorld->GetWorldPartition();
+	//WorldPartition->ForEachActorDescContainerInstance([&](UActorDescContainerInstance* ActorDescContainerInstance) {
+	//	for (UActorDescContainerInstance::TConstIterator<AWorldPartitionHLOD> HLODIterator(ActorDescContainerInstance); HLODIterator; ++HLODIterator)
+	//	{
+
+	//		FWorldPartitionHandle HLODActorHandle(WorldPartition, HLODIterator->GetGuid());
+	//		FString ActorName = HLODIterator->GetActorLabelOrName().ToString();
+	//		FRegexMatcher Matcher(FRegexPattern(TEXT("(.+)/(.+)_L(.+)_X(.+)_Y(.+)"), ERegexPatternFlags::CaseInsensitive), ActorName);
+	//		if (Matcher.FindNext()) {
+	//			FString HLODName = Matcher.GetCaptureGroup(1);
+	//			FString GridName = Matcher.GetCaptureGroup(2);
+	//			int LevelIndex = FCString::Atoi(*Matcher.GetCaptureGroup(3));
+	//			int CellX = FCString::Atoi(*Matcher.GetCaptureGroup(4));
+	//			int CellY = FCString::Atoi(*Matcher.GetCaptureGroup(5));
+	//			FActorDescInfo NewInfo;
+	//			NewInfo.CellX = CellX;
+	//			NewInfo.CellY = CellY;
+	//			//NewInfo.ActorDesc = MakeShared<FWorldPartitionActorDesc>(HLODActorHandle->GetActorDesc());
+	//			FHLODLevelInfo& LevelInfo = mLevelActorDescInfoMap.FindOrAdd(GridName).FindOrAdd(HLODName).FindOrAdd(LevelIndex);
+	//			LevelInfo.HLods.Add(NewInfo);
+	//			LevelInfo.LevelBound += HLODActorHandle->GetEditorBounds();;
+	//			bool bExisted = false;
+	//			for (auto Name : mGridNames) {
+	//				if (*Name == GridName) {
+	//					bExisted = true;
+	//					break;
+	//				}
+	//			}
+	//			if (!bExisted)
+	//				mGridNames.Add(MakeShared<FString>(GridName));
+	//		}
+	//	}
+	//});
+	//if (!mGridNames.IsEmpty()) {
+	//	mGridNameComboBox->SetSelectedItem(mGridNames[0]);
+	//}
 }
 
 TSharedRef<ITableRow> SHLODOutliner::OnGenerateRow(TSharedPtr<FWorldPartitionActorDesc> InInfo, const TSharedRef<STableViewBase>& InOwnerTable) {
@@ -526,7 +538,104 @@ void SHLODOutliner::OnSelectHLODSourceActor(TSharedPtr<FWorldPartitionActorDesc>
 
 TSharedPtr<SWidget> UHLODPreviewTool::BuildWidget()
 {
-	return SAssignNew(HLODOutliner, SHLODOutliner);
+	HLODOutliner = SNew(SHLODOutliner);
+	FWorldPartitionStats Stats = Generate(GetWorld());
+	HLODOutliner->SetWorld(GetWorld());
+	return HLODOutliner;
+}
+
+FWorldPartitionStats UHLODPreviewTool::Generate(UWorld* InWorld)
+{
+	FWorldPartitionStats Stats;
+	if (InWorld == nullptr || InWorld->GetWorldPartition() == nullptr)
+		return Stats;
+
+	UE::Private::WorldPartition::FStreamingDescriptor StreamingDesc;
+	UE::Private::WorldPartition::FStreamingDescriptor::FStreamingDescriptorParams Params;
+	UE::Private::WorldPartition::FStreamingDescriptor::GenerateStreamingDescriptor(InWorld, StreamingDesc, Params);
+	for (UE::Private::WorldPartition::FStreamingDescriptor::FStreamingGrid& Grid : StreamingDesc.StreamingGrids) {
+		FWorldPartitionGridStats& GridStats = Stats.Grids.AddZeroed_GetRef();
+		GridStats.GridName = Grid.Name;
+		GridStats.Bounds = Grid.Bounds;
+		GridStats.CellSize = Grid.CellSize;
+		GridStats.LoadingRange = Grid.LoadingRange;
+		for (UE::Private::WorldPartition::FStreamingDescriptor::FStreamingCell& Cell : Grid.StreamingCells) {
+			FWorldPartitionCellStats& CellStats = GridStats.Cells.AddZeroed_GetRef();
+			CellStats.CellPackage = Cell.CellPackage;
+			CellStats.Bounds = Cell.Bounds;
+			CellStats.bIsSpatiallyLoaded = Cell.bIsSpatiallyLoaded;
+			CellStats.DataLayers = Cell.DataLayers;
+			for (const UE::Private::WorldPartition::FStreamingDescriptor::FStreamingActor& Actor: Cell.Actors) {
+				FWorldPartitionActorStats& ActorStats = CellStats.Actors.AddZeroed_GetRef();
+				ActorStats.BaseClass = Actor.BaseClass;
+				ActorStats.NativeClass = Actor.NativeClass;
+				ActorStats.Path = Actor.Path;
+				ActorStats.Package = Actor.Package;
+				ActorStats.Label = Actor.Label;
+				ActorStats.ActorGuid = Actor.ActorGuid;
+			}
+		}
+	}
+
+	UWorldPartition * WorldPartition = InWorld->GetWorldPartition();
+	UWorldPartition::FGenerateStreamingParams StreamingParams = UWorldPartition::FGenerateStreamingParams();
+	UWorldPartition::FGenerateStreamingContext Context;
+	WorldPartition->GenerateStreaming(StreamingParams, Context);
+	WorldPartition->RuntimeHash->ForEachStreamingCells([&Stats](const UWorldPartitionRuntimeCell* Cell) {
+		FWorldPartitionGridStats* GridStats = Stats.Grids.FindByPredicate([Cell](const FWorldPartitionGridStats& GridStats) {
+			return GridStats.GridName == Cell->RuntimeCellData->GridName;
+		});
+		if (GridStats == nullptr) {
+			return true;
+		}
+		FWorldPartitionCellStats* CellStats = GridStats->Cells.FindByPredicate([Cell, GridStats](const FWorldPartitionCellStats& CellStats) {
+			return CellStats.CellPackage == Cell->GetName();
+		});
+		if (CellStats == nullptr) {
+			return true;
+		}
+		CellStats->CellName = *Cell->GetDebugName();
+		CellStats->HierarchicalLevel = Cell->RuntimeCellData->HierarchicalLevel;
+		CellStats->Priority = Cell->RuntimeCellData->Priority;
+		for (auto& ActorStats: CellStats->Actors) {
+			AActor* Actor = Cast<AActor>(ActorStats.Path.TryLoad());
+			TArray<UActorComponent*> ActorCompoents;
+			TSet<UTexture*> CellUsedTextures;
+			Actor->GetComponents(ActorCompoents, true);
+			for (auto ActorComp : ActorCompoents) {
+				CellStats->ComponentCount.FindOrAdd(ActorComp->GetClass()->GetName())++;
+				if(auto SMC = Cast<UStaticMeshComponent>(ActorComp)){
+					UStaticMesh* Mesh = SMC->GetStaticMesh();
+					ActorStats.DrawCallCount += Mesh->GetNumSections(0);
+					if (auto ISMC = Cast<UInstancedStaticMeshComponent>(SMC)) {
+						ActorStats.TriangleCount += Mesh->GetNumTriangles(0) * ISMC->GetInstanceCount();
+					}
+					else {
+						ActorStats.TriangleCount += Mesh->GetNumTriangles(0);
+					}
+					for (UMaterialInterface* Material : SMC->GetMaterials()) {
+						if (Material) {
+							TArray<UTexture*> MaterialTextures;
+							Material->GetUsedTextures(MaterialTextures, EMaterialQualityLevel::Num, true, ERHIFeatureLevel::Num, true);
+							CellUsedTextures.Append(MaterialTextures);
+						}
+					}
+				}
+			}
+			CellStats->DrawCallCount += ActorStats.DrawCallCount;
+			CellStats->TriangleCount += ActorStats.TriangleCount;
+			CellStats->UsedTextures.Append(CellUsedTextures.Array());
+		}
+		UE_LOG(LogTemp, Warning, TEXT("%s"), *Cell->GetDebugName());
+		return true;
+	});
+
+	//URuntimeHashExternalStreamingObjectBase* ExternalStreamingObject = WorldPartition->FlushStreamingToExternalStreamingObject();
+	//ExternalStreamingObject->ForEachStreamingCells([](const UWorldPartitionRuntimeCell& Cell){
+	//	UE_LOG(LogTemp, Warning, TEXT("%s"), *Cell.GetDebugName());
+	//	return true;
+	//});
+	return Stats;
 }
 
 #undef LOCTEXT_NAMESPACE
